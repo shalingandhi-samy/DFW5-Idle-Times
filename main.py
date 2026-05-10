@@ -21,6 +21,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from scraper import (
@@ -120,6 +121,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="DFW5 Idle Times", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
