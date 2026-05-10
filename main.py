@@ -56,15 +56,19 @@ def _empty_state() -> dict:
 _states: dict[str, dict]          = {bid: _empty_state() for bid in BUILDINGS}
 _locks:  dict[str, asyncio.Lock]  = {bid: asyncio.Lock() for bid in BUILDINGS}
 
+# Only one building scrapes at a time — they share auth_state.json + DRAX session
+_scrape_sem = asyncio.Semaphore(1)
+
 
 # ── Scrape helpers ────────────────────────────────────────────────────────────
 
 async def _run_scrape(building_id: str) -> None:
     try:
-        result = await asyncio.wait_for(
-            asyncio.to_thread(scrape_idle_data_sync, building_id),
-            timeout=SCRAPE_TIMEOUT,
-        )
+        async with _scrape_sem:   # only one FC switch + scrape at a time
+            result = await asyncio.wait_for(
+                asyncio.to_thread(scrape_idle_data_sync, building_id),
+                timeout=SCRAPE_TIMEOUT,
+            )
         async with _locks[building_id]:
             _states[building_id].update(result)
     except asyncio.TimeoutError:
@@ -92,7 +96,9 @@ async def _trigger_scrape(building_id: str) -> None:
     asyncio.create_task(_run_scrape(building_id))
 
 
-async def _background_loop(building_id: str) -> None:
+async def _background_loop(building_id: str, initial_delay: int = 0) -> None:
+    if initial_delay:
+        await asyncio.sleep(initial_delay)  # stagger so buildings don't collide at startup
     while True:
         await _trigger_scrape(building_id)
         await asyncio.sleep(SCRAPE_EVERY_SECS)
@@ -114,8 +120,11 @@ async def lifespan(app: FastAPI):
             except Exception as exc:
                 logger.warning("[%s] Could not load cache: %s", bid, exc)
 
-    # Start a background scrape loop per building
-    tasks = [asyncio.create_task(_background_loop(bid)) for bid in BUILDINGS]
+    # Start a background scrape loop per building, staggered by 5s each
+    tasks = [
+        asyncio.create_task(_background_loop(bid, initial_delay=i * 5))
+        for i, bid in enumerate(BUILDINGS)
+    ]
     yield
     for t in tasks:
         t.cancel()
