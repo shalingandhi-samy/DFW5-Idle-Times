@@ -111,33 +111,39 @@
       _startIdleTimers();
     });
 
-    // ── Live idle timers ─────────────────────────────────────────────────────
-    function _fmtDuration(totalSeconds) {
+    // ── Elapsed timers (how long since last activity) ────────────────────────
+    function _fmtElapsed(totalSeconds) {
       if (totalSeconds < 0) totalSeconds = 0;
       const h = Math.floor(totalSeconds / 3600);
       const m = Math.floor((totalSeconds % 3600) / 60);
       const s = Math.floor(totalSeconds % 60);
-      return [
-        String(h).padStart(2, '0'),
-        String(m).padStart(2, '0'),
-        String(s).padStart(2, '0'),
-      ].join(':');
+      return (h ? `${h}h ` : '') +
+             (h || m ? `${String(m).padStart(2,'0')}m ` : '') +
+             `${String(s).padStart(2,'0')}s ago`;
     }
 
-    function _startIdleTimers() {
-      document.querySelectorAll('.idle-timer[data-since]').forEach(el => {
-        const since = new Date(el.dataset.since);
+    function _parseTs(ts) {
+      // DRAX format: "MM-DD HH:MM:SS" — prepend current year
+      const year = new Date().getFullYear();
+      return new Date(`${year}-${ts.replace(' ', 'T')}`);
+    }
+
+    function _startElapsedTimers() {
+      document.querySelectorAll('.elapsed-timer[data-ts]').forEach(el => {
+        const since = _parseTs(el.dataset.ts);
+        if (isNaN(since)) { el.textContent = ''; return; }
         const update = () => {
           const secs = Math.floor((Date.now() - since.getTime()) / 1000);
-          el.textContent = _fmtDuration(secs);
+          el.textContent = '(' + _fmtElapsed(secs) + ')';
         };
         update();
-        if (el._timerInterval) clearInterval(el._timerInterval);
-        el._timerInterval = setInterval(update, 1000);
+        if (el._timer) clearInterval(el._timer);
+        el._timer = setInterval(update, 1000);
       });
     }
 
-    document.addEventListener('DOMContentLoaded', _startIdleTimers);
+    document.addEventListener('DOMContentLoaded', _startElapsedTimers);
+    document.body.addEventListener('htmx:afterSwap', _startElapsedTimers);
   </script>
 </body>
 </html>

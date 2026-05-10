@@ -75,7 +75,13 @@
         {% for a in sp_list %}
         <tr class="hover:bg-blue-50 transition-colors">
           <td class="px-4 py-2 font-medium text-gray-800">{{ a.name or '—' }}</td>
-          <td class="px-4 py-2 text-center font-mono text-xs text-gray-600">{{ a.timestamp or '—' }}</td>
+          <td class="px-4 py-2 text-center font-mono text-xs text-gray-600">
+            {% if a.timestamp %}
+              <span>{{ a.timestamp }}</span>
+              <span class="elapsed-timer ml-1 text-wmt-blue font-semibold"
+                    data-ts="{{ a.timestamp }}">…</span>
+            {% else %}—{% endif %}
+          </td>
           <td class="px-4 py-2 text-center">
             {% if a.drax_url and a.associate_id %}
             <a href="{{ a.drax_url }}" target="_blank"
@@ -108,7 +114,13 @@
         {% for a in bf_list %}
         <tr class="hover:bg-yellow-50 transition-colors">
           <td class="px-4 py-2 font-medium text-gray-800">{{ a.name or '—' }}</td>
-          <td class="px-4 py-2 text-center font-mono text-xs text-gray-600">{{ a.timestamp or '—' }}</td>
+          <td class="px-4 py-2 text-center font-mono text-xs text-gray-600">
+            {% if a.timestamp %}
+              <span>{{ a.timestamp }}</span>
+              <span class="elapsed-timer ml-1 text-yellow-700 font-semibold"
+                    data-ts="{{ a.timestamp }}">…</span>
+            {% else %}—{% endif %}
+          </td>
           <td class="px-4 py-2 text-center">
             {% if a.drax_url and a.associate_id %}
             <a href="{{ a.drax_url }}" target="_blank"
