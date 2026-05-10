@@ -16,14 +16,28 @@ BUILDINGS: dict[str, dict] = {
         "name":           "DFW5",
         "label":          "Dallas / Fort Worth 5",
         "fc_search":      "DFW5",
-        "tz_offset_secs": -3600,
+        "tz_offset_secs": -3600,   # Central (server is Eastern)
     },
     "phl5": {
         "id":             "phl5",
         "name":           "PHL5",
         "label":          "Philadelphia 5",
         "fc_search":      "PHL5",
-        "tz_offset_secs": 0,
+        "tz_offset_secs": 0,        # Eastern
+    },
+    "ord1": {
+        "id":             "ord1",
+        "name":           "ORD1",
+        "label":          "Chicago / O'Hare 1",
+        "fc_search":      "ORD1",
+        "tz_offset_secs": -3600,   # Central (server is Eastern)
+    },
+    "ind3": {
+        "id":             "ind3",
+        "name":           "IND3",
+        "label":          "Indianapolis 3",
+        "fc_search":      "IND3",
+        "tz_offset_secs": 0,        # Eastern
     },
 }
 
