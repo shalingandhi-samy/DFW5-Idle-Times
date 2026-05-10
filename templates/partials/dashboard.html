@@ -63,19 +63,31 @@
       <span>🔵 Stationary Picking</span>
       <span>{{ sp_list | length }} associates</span>
     </div>
-    <ul class="divide-y divide-gray-100 bg-white">
-      {% for a in sp_list %}
-      <li class="px-4 py-2 flex items-center justify-between hover:bg-blue-50 transition-colors">
-        <span class="font-medium text-gray-800 text-sm">{{ a.name or '—' }}</span>
-        {% if a.drax_url and a.associate_id %}
-        <a href="{{ a.drax_url }}" target="_blank"
-           class="text-xs text-wmt-blue underline hover:text-blue-800">View ↗</a>
-        {% endif %}
-      </li>
-      {% else %}
-      <li class="px-4 py-3 text-sm text-gray-400 italic">No associates found</li>
-      {% endfor %}
-    </ul>
+    <table class="w-full text-sm bg-white">
+      <thead>
+        <tr class="bg-gray-50 text-xs text-gray-500 uppercase border-b border-gray-200">
+          <th class="px-4 py-2 text-left">Name</th>
+          <th class="px-4 py-2 text-center">Last Timestamp</th>
+          <th class="px-4 py-2 text-center">DRAX</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for a in sp_list %}
+        <tr class="hover:bg-blue-50 transition-colors">
+          <td class="px-4 py-2 font-medium text-gray-800">{{ a.name or '—' }}</td>
+          <td class="px-4 py-2 text-center font-mono text-xs text-gray-600">{{ a.timestamp or '—' }}</td>
+          <td class="px-4 py-2 text-center">
+            {% if a.drax_url and a.associate_id %}
+            <a href="{{ a.drax_url }}" target="_blank"
+               class="text-xs text-wmt-blue underline hover:text-blue-800">View ↗</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="px-4 py-3 text-sm text-gray-400 italic">No associates found</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 
   <!-- Box Finishing -->
@@ -84,19 +96,31 @@
       <span>📦 Box Finishing</span>
       <span>{{ bf_list | length }} associates</span>
     </div>
-    <ul class="divide-y divide-gray-100 bg-white">
-      {% for a in bf_list %}
-      <li class="px-4 py-2 flex items-center justify-between hover:bg-yellow-50 transition-colors">
-        <span class="font-medium text-gray-800 text-sm">{{ a.name or '—' }}</span>
-        {% if a.drax_url and a.associate_id %}
-        <a href="{{ a.drax_url }}" target="_blank"
-           class="text-xs text-wmt-blue underline hover:text-blue-800">View ↗</a>
-        {% endif %}
-      </li>
-      {% else %}
-      <li class="px-4 py-3 text-sm text-gray-400 italic">No associates found</li>
-      {% endfor %}
-    </ul>
+    <table class="w-full text-sm bg-white">
+      <thead>
+        <tr class="bg-gray-50 text-xs text-gray-500 uppercase border-b border-gray-200">
+          <th class="px-4 py-2 text-left">Name</th>
+          <th class="px-4 py-2 text-center">Last Timestamp</th>
+          <th class="px-4 py-2 text-center">DRAX</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for a in bf_list %}
+        <tr class="hover:bg-yellow-50 transition-colors">
+          <td class="px-4 py-2 font-medium text-gray-800">{{ a.name or '—' }}</td>
+          <td class="px-4 py-2 text-center font-mono text-xs text-gray-600">{{ a.timestamp or '—' }}</td>
+          <td class="px-4 py-2 text-center">
+            {% if a.drax_url and a.associate_id %}
+            <a href="{{ a.drax_url }}" target="_blank"
+               class="text-xs text-wmt-blue underline hover:text-blue-800">View ↗</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="px-4 py-3 text-sm text-gray-400 italic">No associates found</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 
 </div>
