@@ -15,7 +15,9 @@ Run as a subprocess (via scraper.py). Writes results.json on exit.
 from __future__ import annotations
 
 import asyncio
+import io
 import json
+import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -27,6 +29,8 @@ BASE_DIR   = Path(__file__).parent
 AUTH_FILE  = BASE_DIR / "auth_state.json"
 OUT_FILE   = BASE_DIR / "results.json"
 
+# Force UTF-8 stdout so Windows cp1252 doesn't choke on unicode
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 DRAX_BASE          = "https://drax.walmart.com"
 IDLE_THRESHOLD_HRS = 0.25          # 15 min
 ENRICH_CONCURRENCY = 10
@@ -145,11 +149,13 @@ _EXTRACT_JS = """
     // Map known headers → obj fields
     headers.forEach((h, i) => {
       const val = cells[i] ? cells[i].innerText.trim() : '';
-      if (/\\bname\\b/.test(h))                  obj.name        = val;
+      if (/\\bassociate\\b|\\bname\\b/.test(h))             obj.name      = val;
       else if (/win|badge|employee.?id/.test(h)) obj.win         = val;
       else if (/shift/.test(h))                  obj.shift       = val;
-      else if (/dept|department/.test(h))        obj.dept_name   = val;
-      else if (/activity|sc.?code|labor.?code|code/.test(h)) obj.sc_code = val;
+      else if (/current.?dept|current.?department/.test(h)) obj.sc_code   = val;
+      else if (/home.?dept|home.?department/.test(h))        obj.dept_name = val;
+      else if (/activity|sc.?code|labor.?code/.test(h))      obj.sc_code   = val;
+      else if (/\\bdept\\b|\\bdepartment\\b/.test(h))         obj.dept_name = val;
       else if (/idle.?hr|idle.?hour/.test(h))    obj.idle_hours  = parseFloat(val) || 0;
       else if (/idle.?%|idle.?pct/.test(h))      obj.idle_pct    = val;
       else if (/total.?hr|total.?hour/.test(h))  obj.total_hours = parseFloat(val) || 0;
@@ -282,7 +288,7 @@ async def _enrich_one(ctx: Any, row: dict, sem: asyncio.Semaphore) -> None:
 async def main() -> None:
     after, before = _shift_window()
     url = _overview_url(after, before)
-    print(f"[INFO] Shift window: {after}  →  {before}")
+    print(f"[INFO] Shift window: {after}  ->  {before}")
     print(f"[INFO] URL: {url}")
 
     storage = json.loads(AUTH_FILE.read_text()) if AUTH_FILE.exists() else None
@@ -293,9 +299,9 @@ async def main() -> None:
         page = await ctx.new_page()
         await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
 
-        # Handle SSO if redirected
-        if "login" in page.url.lower() or "sso" in page.url.lower():
-            print("[INFO] SSO login required — waiting up to 3 min…")
+        # Handle any SSO redirect (not just URLs containing 'login'/'sso')
+        if not page.url.startswith(DRAX_BASE):
+            print(f"[INFO] Redirected to SSO ({page.url[:60]}…) — waiting up to 3 min for login…")
             await page.wait_for_url(f"{DRAX_BASE}/**", timeout=180_000)
 
         if not await _wait_for_any_datatable(page):
@@ -318,6 +324,10 @@ async def main() -> None:
         all_rows: list[dict] = payload.get("rows", [])
         headers:  list[str]  = payload.get("headers", [])
         print(f"[INFO] Phase 1 OK — {len(all_rows)} rows, headers={headers}")
+        # Debug: dump first 5 rows so we can see what sc_code + associate_id look like
+        for i, r in enumerate(all_rows[:5]):
+            print(f"[DEBUG] row[{i}] name={r.get('name')!r} sc_code={r.get('sc_code')!r} "
+                  f"associate_id={r.get('associate_id')!r} raw={r.get('_raw')}")
 
         # ── Filter to target SC codes ─────────────────────────────────────────
         targets: list[dict] = []
