@@ -1,12 +1,12 @@
-{% set total_flagged = associates | selectattr("is_flagged") | list | length %}
-{% set any_flagged   = total_flagged > 0 %}
+{% set sp_list = associates | selectattr("resolved_sc_code", "equalto", "019209516") | list %}
+{% set bf_list = associates | selectattr("resolved_sc_code", "equalto", "019034514") | list %}
 
 <!-- ── Status bar ──────────────────────────────────────────────────────────── -->
 <div class="flex items-center justify-between mb-4 text-sm text-gray-500">
   <span>
     {% if scraped_at %}
       Last updated: <strong class="text-gray-700">{{ scraped_at.replace("T", " ") }}</strong>
-      &nbsp;·&nbsp; {{ associates | length }} associates tracked
+      &nbsp;·&nbsp; {{ associates | length }} associates currently IN
     {% else %}
       <span class="italic">Waiting for first scrape…</span>
     {% endif %}
@@ -18,9 +18,7 @@
 {% if refreshing %}
 <div class="bg-blue-50 border border-blue-300 text-blue-800 rounded-lg px-4 py-3 mb-4 flex items-center gap-3">
   <div class="w-4 h-4 border-2 border-blue-400 border-t-blue-800 rounded-full animate-spin flex-shrink-0"></div>
-  <p class="text-sm font-medium">
-    Scraping DRAX building_overview in the background — data updates when ready (~60 sec).
-  </p>
+  <p class="text-sm font-medium">Pulling data from DRAX — updates when ready (~30 sec).</p>
 </div>
 {% endif %}
 
@@ -35,163 +33,78 @@
 </div>
 {% endif %}
 
-<!-- ── Department summary cards ────────────────────────────────────────────── -->
+<!-- ── Summary cards ───────────────────────────────────────────────────────── -->
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-  {% for code, info in dept_totals.items() %}
-  {% set is_hot = info.flagged > 0 %}
-  <div class="rounded-xl border-2 p-4 flex items-center gap-4 shadow-sm
-    {{ 'border-red-400 bg-red-50' if is_hot else 'border-green-300 bg-green-50' }}">
-    <div class="text-4xl">{{ '🔴' if is_hot else '🟢' }}</div>
-    <div class="flex-1">
-      <p class="font-bold text-gray-800 text-sm">{{ info.label }}</p>
-      <p class="text-xs text-gray-500 font-mono">{{ code }}</p>
-      <p class="mt-1 text-2xl font-black {{ 'text-red-600' if is_hot else 'text-green-700' }}">
-        {{ info.flagged }}
-        <span class="text-sm font-normal text-gray-500">
-          / {{ info.total }} over {{ threshold_label }} idle
-        </span>
-      </p>
-    </div>
-    <div class="text-xs font-semibold px-3 py-1 rounded-full
-      {{ 'bg-red-100 text-red-700 animate-pulse' if is_hot else 'bg-green-100 text-green-700' }}">
-      {{ 'ACTION NEEDED' if is_hot else 'All Clear ✓' }}
+  <div class="rounded-xl border-2 border-blue-300 bg-blue-50 p-4 flex items-center gap-4 shadow-sm">
+    <div class="text-4xl">🔵</div>
+    <div>
+      <p class="font-bold text-gray-800 text-sm">Stationary Picking</p>
+      <p class="text-xs text-gray-500 font-mono">019209516</p>
+      <p class="mt-1 text-3xl font-black text-blue-700">{{ sp_list | length }}</p>
     </div>
   </div>
-  {% endfor %}
+  <div class="rounded-xl border-2 border-yellow-300 bg-yellow-50 p-4 flex items-center gap-4 shadow-sm">
+    <div class="text-4xl">📦</div>
+    <div>
+      <p class="font-bold text-gray-800 text-sm">Box Finishing</p>
+      <p class="text-xs text-gray-500 font-mono">019034514</p>
+      <p class="mt-1 text-3xl font-black text-yellow-700">{{ bf_list | length }}</p>
+    </div>
+  </div>
 </div>
 
-<!-- ── Alert / clear banner ───────────────────────────────────────────────── -->
-{% if any_flagged %}
-<div class="bg-red-600 text-white rounded-lg px-5 py-3 mb-5 flex items-center gap-3 shadow">
-  <span class="text-2xl">🚨</span>
-  <p class="font-bold">
-    {{ total_flagged }} associate{{ 's' if total_flagged != 1 else '' }}
-    {{ 'have' if total_flagged != 1 else 'has' }} been idle for more than {{ threshold_label }}!
-  </p>
-</div>
-{% elif scraped_at and associates %}
-<div class="bg-green-50 border border-green-300 text-green-800 rounded-lg px-5 py-3 mb-5 flex items-center gap-3">
-  <span class="text-2xl">✅</span>
-  <p class="font-semibold">All associates are active — nobody over {{ threshold_label }} idle!</p>
-</div>
-{% endif %}
-
-<!-- ── Associates table ────────────────────────────────────────────────────── -->
+<!-- ── Side-by-side name lists ─────────────────────────────────────────────── -->
 {% if associates %}
-<div class="overflow-x-auto rounded-xl shadow border border-gray-200">
-  <table class="w-full text-sm">
-    <thead>
-      <tr class="bg-wmt-blue text-white text-left text-xs uppercase tracking-wide">
-        <th class="px-4 py-3">#</th>
-        <th class="px-4 py-3">Associate</th>
-        <th class="px-4 py-3">WIN · Shift</th>
-        <th class="px-4 py-3">Role</th>
-        <th class="px-4 py-3 text-center">⏱ Current Idle</th>
-        <th class="px-4 py-3 text-center">Status</th>
-        <th class="px-4 py-3 text-center">DRAX</th>
-      </tr>
-    </thead>
-    <tbody class="divide-y divide-gray-100">
-      {% for a in associates %}
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
 
-      {% if a.is_flagged %}
-        {% set row_cls = 'bg-red-50' %}
-      {% elif a.current_idle_mins and a.current_idle_mins > 5 %}
-        {% set row_cls = 'bg-amber-50' %}
+  <!-- Stationary Picking -->
+  <div class="rounded-xl border border-blue-200 shadow-sm overflow-hidden">
+    <div class="bg-wmt-blue text-white px-4 py-2 font-bold text-sm flex justify-between">
+      <span>🔵 Stationary Picking</span>
+      <span>{{ sp_list | length }} associates</span>
+    </div>
+    <ul class="divide-y divide-gray-100 bg-white">
+      {% for a in sp_list %}
+      <li class="px-4 py-2 flex items-center justify-between hover:bg-blue-50 transition-colors">
+        <span class="font-medium text-gray-800 text-sm">{{ a.name or '—' }}</span>
+        {% if a.drax_url and a.associate_id %}
+        <a href="{{ a.drax_url }}" target="_blank"
+           class="text-xs text-wmt-blue underline hover:text-blue-800">View ↗</a>
+        {% endif %}
+      </li>
       {% else %}
-        {% set row_cls = 'bg-white' %}
-      {% endif %}
-
-      <tr class="{{ row_cls }} hover:brightness-95 transition-all">
-
-        <!-- # -->
-        <td class="px-4 py-3 text-gray-400 font-mono text-xs">{{ loop.index }}</td>
-
-        <!-- Name -->
-        <td class="px-4 py-3 font-semibold text-gray-800">
-          {{ a.name or '—' }}
-        </td>
-
-        <!-- WIN · Shift -->
-        <td class="px-4 py-3">
-          <span class="font-mono text-xs text-gray-600">{{ a.win or '—' }}</span>
-          {% if a.shift %}
-          <span class="ml-2 bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">
-            {{ a.shift }}
-          </span>
-          {% endif %}
-        </td>
-
-        <!-- Role (SC code + label) -->
-        <td class="px-4 py-3">
-          {% set sc_label = target_codes.get(a.resolved_sc_code, a.sc_code or '—') %}
-          <p class="font-medium text-gray-700">{{ sc_label }}</p>
-          <p class="text-xs font-mono text-gray-400">{{ a.resolved_sc_code or a.sc_code or '' }}</p>
-        </td>
-
-        <!-- Live idle timer -->
-        <td class="px-4 py-3 text-center">
-          {% if a.is_on_lunch %}
-            <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-1 rounded-full">
-              🍽️ On Lunch
-            </span>
-          {% elif not a.is_clocked_in %}
-            <span class="inline-flex items-center gap-1 bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-full">
-              🏁 Clocked Out
-            </span>
-          {% elif a.last_scan_iso %}
-            <span
-              class="idle-timer font-black text-lg {{ 'text-red-600' if a.is_flagged else 'text-gray-600' }}"
-              data-since="{{ a.last_scan_iso }}">
-              --:--:--
-            </span>
-            <p class="text-xs text-gray-400 mt-0.5">last scan {{ a.last_scan_iso[11:19] }}</p>
-          {% else %}
-            <span class="text-gray-300 text-xs">No scan data</span>
-          {% endif %}
-        </td>
-
-        <!-- Status badge -->
-        <td class="px-4 py-3 text-center">
-          {% if a.is_on_lunch %}
-            <span class="bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-1 rounded-full">Lunch</span>
-          {% elif not a.is_clocked_in %}
-            <span class="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-full">Out</span>
-          {% elif a.is_flagged %}
-            <span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full animate-pulse">⚠ Idle</span>
-          {% elif a.current_idle_mins and a.current_idle_mins > 5 %}
-            <span class="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-full">Slowing</span>
-          {% else %}
-            <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">Active ✓</span>
-          {% endif %}
-        </td>
-
-        <!-- DRAX link -->
-        <td class="px-4 py-3 text-center">
-          <a href="{{ a.drax_url }}" target="_blank"
-             class="text-wmt-blue underline text-xs hover:text-blue-800">
-            View ↗
-          </a>
-        </td>
-
-      </tr>
+      <li class="px-4 py-3 text-sm text-gray-400 italic">No associates found</li>
       {% endfor %}
-    </tbody>
-  </table>
-</div>
+    </ul>
+  </div>
 
-<p class="text-xs text-gray-400 mt-2 flex justify-between">
-  <span>🔴 Flagged (&gt;{{ threshold_label }} idle) &nbsp;·&nbsp; 🟡 Slowing (&gt;5 min) &nbsp;·&nbsp; ⚪ Active</span>
-  <span>{{ total_flagged }} flagged of {{ associates | length }} associates</span>
-</p>
+  <!-- Box Finishing -->
+  <div class="rounded-xl border border-yellow-200 shadow-sm overflow-hidden">
+    <div class="bg-yellow-400 text-gray-900 px-4 py-2 font-bold text-sm flex justify-between">
+      <span>📦 Box Finishing</span>
+      <span>{{ bf_list | length }} associates</span>
+    </div>
+    <ul class="divide-y divide-gray-100 bg-white">
+      {% for a in bf_list %}
+      <li class="px-4 py-2 flex items-center justify-between hover:bg-yellow-50 transition-colors">
+        <span class="font-medium text-gray-800 text-sm">{{ a.name or '—' }}</span>
+        {% if a.drax_url and a.associate_id %}
+        <a href="{{ a.drax_url }}" target="_blank"
+           class="text-xs text-wmt-blue underline hover:text-blue-800">View ↗</a>
+        {% endif %}
+      </li>
+      {% else %}
+      <li class="px-4 py-3 text-sm text-gray-400 italic">No associates found</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+</div>
 
 {% elif not error %}
-<!-- Loading state -->
 <div class="text-center py-16 text-gray-400">
   <div class="inline-block w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-  <p class="text-sm">Connecting to DRAX building_overview…</p>
-  <p class="text-xs mt-1 text-gray-300">
-    A browser window may open for SSO login. This takes ~60 sec on first run.
-  </p>
+  <p class="text-sm">Connecting to DRAX /associates/ …</p>
+  <p class="text-xs mt-1 text-gray-300">A browser window may open for SSO login.</p>
 </div>
 {% endif %}

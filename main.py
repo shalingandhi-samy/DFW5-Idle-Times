@@ -51,8 +51,6 @@ _state: dict = {
     },
     "all_count":    0,
     "scraped_at":   None,
-    "shift_after":  None,
-    "shift_before": None,
     "error":        None,
     "refreshing":   False,
 }
@@ -150,8 +148,6 @@ def _ctx() -> dict:
         "dept_totals":     _state["dept_totals"],
         "all_count":       _state["all_count"],
         "scraped_at":      _state["scraped_at"],
-        "shift_after":     _state["shift_after"],
-        "shift_before":    _state["shift_before"],
         "error":           _state["error"],
         "refreshing":      _state["refreshing"],
         "threshold":       IDLE_THRESHOLD_HRS,

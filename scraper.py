@@ -56,7 +56,5 @@ def _error(msg: str) -> dict:
         },
         "all_count":    0,
         "scraped_at":   datetime.now().isoformat(timespec="seconds"),
-        "shift_after":  None,
-        "shift_before": None,
         "error":        msg,
     }

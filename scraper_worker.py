@@ -1,15 +1,11 @@
 """
-scraper_worker.py — Playwright scraper for DRAX building_overview.
+scraper_worker.py — Simple Playwright scraper for DRAX /associates/.
 
-Targets associates currently coded as:
-  - Stationary Pick  (019209516)
-  - Box Finishing    (019034514)
+Goes to drax.walmart.com/associates/, finds everyone with:
+  - Status: IN
+  - Current Dept: Stationary Picking OR Box Finishing
 
-Detects the active shift window automatically, navigates building_overview
-with date_hour_after/before params, extracts the DataTable, filters target
-SC codes, then enriches each associate from their individual DRAX page.
-
-Run as a subprocess (via scraper.py). Writes results.json on exit.
+Writes results.json then exits. Run as subprocess via scraper.py.
 """
 
 from __future__ import annotations
@@ -18,396 +14,193 @@ import asyncio
 import io
 import json
 import sys
-from datetime import date, datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from playwright.async_api import async_playwright
 
-# ── Config ────────────────────────────────────────────────────────────────────
-BASE_DIR   = Path(__file__).parent
-AUTH_FILE  = BASE_DIR / "auth_state.json"
-OUT_FILE   = BASE_DIR / "results.json"
-
-# Force UTF-8 stdout so Windows cp1252 doesn't choke on unicode
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-DRAX_BASE          = "https://drax.walmart.com"
-IDLE_THRESHOLD_HRS = 0.25          # 15 min
-ENRICH_CONCURRENCY = 10
+
+BASE_DIR  = Path(__file__).parent
+AUTH_FILE = BASE_DIR / "auth_state.json"
+OUT_FILE  = BASE_DIR / "results.json"
+
+DRAX_BASE = "https://drax.walmart.com"
+ASSOC_URL = f"{DRAX_BASE}/associates/"
+
+TARGET_DEPTS = {"stationary picking", "box finishing"}
 
 TARGET_SC_CODES: dict[str, str] = {
-    "019209516": "Stationary Pick",
+    "019209516": "Stationary Picking",
     "019034514": "Box Finishing",
 }
 
-# Text patterns that may appear in the SC code / activity column on overview page
-_SC_ALIASES: dict[str, str] = {
-    "019209516": "019209516",
-    "stationary pick": "019209516",
-    "stationary picking": "019209516",
-    "019034514": "019034514",
-    "box finishing": "019034514",
-    "box finish": "019034514",
-}
-
-
-# ── Shift window helpers ──────────────────────────────────────────────────────
-
-def _shift_window() -> tuple[str, str]:
-    """
-    Return (date_hour_after, date_hour_before) for the CURRENT shift.
-    Day  shift: 06:30 – 18:30 same day
-    Night shift: 18:30 today – 06:30 tomorrow
-    Format: 'YYYY-MM-DD HH:MM'
-    """
-    now = datetime.now()
-    day_start = now.replace(hour=6,  minute=30, second=0, microsecond=0)
-    day_end   = now.replace(hour=18, minute=30, second=0, microsecond=0)
-
-    if day_start <= now < day_end:
-        after  = day_start.strftime("%Y-%m-%d %H:%M")
-        before = day_end.strftime("%Y-%m-%d %H:%M")
-    else:
-        # Night shift
-        if now < day_start:
-            # Early morning — night shift started yesterday
-            ns_start = (now - timedelta(days=1)).replace(hour=18, minute=30, second=0, microsecond=0)
-            ns_end   = day_start
-        else:
-            # Post 18:30 — night shift started today
-            ns_start = day_end
-            ns_end   = (now + timedelta(days=1)).replace(hour=6, minute=30, second=0, microsecond=0)
-        after  = ns_start.strftime("%Y-%m-%d %H:%M")
-        before = ns_end.strftime("%Y-%m-%d %H:%M")
-
-    return after, before
-
-
-def _overview_url(after: str, before: str) -> str:
-    after_enc  = after.replace(" ", "+").replace(":", "%3A")
-    before_enc = before.replace(" ", "+").replace(":", "%3A")
-    return (
-        f"{DRAX_BASE}/building_overview/"
-        f"?date_hour_after={after_enc}&date_hour_before={before_enc}"
-    )
-
-
-def _assoc_url(assoc_id: str) -> str:
-    return f"{DRAX_BASE}/associates/{assoc_id}/?date={date.today().isoformat()}"
-
-
-# ── JavaScript extractors ─────────────────────────────────────────────────────
-
-# Discovers ALL DataTables on the page and returns a summary per table
-_DISCOVER_JS = """
-() => {
-  const summary = [];
-  if (typeof $ === 'undefined' || !$.fn.DataTable) return summary;
-  $('table').each(function () {
-    if (!$.fn.DataTable.isDataTable(this)) return;
-    const dt = $(this).DataTable();
-    const headers = Array.from(this.querySelectorAll('thead th'))
-                         .map(th => th.innerText.trim());
-    summary.push({ id: this.id, rows: dt.rows().count(), headers });
-  });
-  return summary;
-}
-"""
-
-# Extracts all rows from the DataTable with the given element id.
-# Falls back to the first DataTable if id is null/empty.
+# ── Extract all rows from the associates DataTable ────────────────────────────
 _EXTRACT_JS = """
-(tableId) => {
-  let dt;
-  if (tableId) {
-    dt = $('#' + tableId).DataTable();
-  } else {
-    const first = $('table').filter(function () {
-      return $.fn.DataTable.isDataTable(this);
-    }).first();
-    if (!first.length) return { headers: [], rows: [] };
-    dt = first.DataTable();
-    tableId = first.attr('id') || '';
-  }
+() => {
+  // Find the DataTable on the page
+  const tables = $('table').filter(function() {
+    return $.fn.DataTable && $.fn.DataTable.isDataTable(this);
+  });
+  if (!tables.length) return { headers: [], rows: [] };
 
-  const headers = Array.from(
-    document.getElementById(tableId)
-      ? document.getElementById(tableId).querySelectorAll('thead th')
-      : []
-  ).map(th => th.innerText.trim().toLowerCase());
+  const tbl   = tables.first();
+  const dt    = tbl.DataTable();
+  const node  = tbl[0];
+
+  const headers = Array.from(node.querySelectorAll('thead th'))
+                       .map(th => th.innerText.trim().toLowerCase());
 
   const rows = [];
-  dt.rows().every(function () {
+  dt.rows().every(function() {
     const cells = Array.from(this.node().querySelectorAll('td'));
-    const obj = { _raw: cells.map(c => c.innerText.trim()) };
+    const raw   = cells.map(c => c.innerText.trim());
 
-    // Try to grab associate_id from any link in the row
+    const obj = { _raw: raw };
+
+    // Extract associate_id from any link in the row
     const link = this.node().querySelector('a[href*="/associates/"]');
-    const idMatch = link && link.href.match(/\\/associates\\/(\\d+)\\//);
-    obj.associate_id = idMatch ? idMatch[1] : null;
-
-    // Map known headers → obj fields
-    headers.forEach((h, i) => {
-      const val = cells[i] ? cells[i].innerText.trim() : '';
-      if (/\\bassociate\\b|\\bname\\b/.test(h))             obj.name      = val;
-      else if (/win|badge|employee.?id/.test(h)) obj.win         = val;
-      else if (/shift/.test(h))                  obj.shift       = val;
-      else if (/current.?dept|current.?department/.test(h)) obj.sc_code   = val;
-      else if (/home.?dept|home.?department/.test(h))        obj.dept_name = val;
-      else if (/activity|sc.?code|labor.?code/.test(h))      obj.sc_code   = val;
-      else if (/\\bdept\\b|\\bdepartment\\b/.test(h))         obj.dept_name = val;
-      else if (/idle.?hr|idle.?hour/.test(h))    obj.idle_hours  = parseFloat(val) || 0;
-      else if (/idle.?%|idle.?pct/.test(h))      obj.idle_pct    = val;
-      else if (/total.?hr|total.?hour/.test(h))  obj.total_hours = parseFloat(val) || 0;
-    });
-
-    // Fallbacks: if header mapping missed fields, sniff raw cells
-    if (!obj.associate_id) {
-      cells.forEach(c => {
-        const a = c.querySelector('a[href*="/associates/"]');
-        if (a) {
-          const m = a.href.match(/\\/associates\\/(\\d+)\\//);
-          if (m) obj.associate_id = m[1];
-        }
-      });
+    if (link) {
+      const parts = link.href.split('/associates/');
+      obj.associate_id = parts.length > 1 ? parts[1].split('/')[0] : null;
+    } else {
+      obj.associate_id = null;
     }
+
+    // Map headers to fields
+    headers.forEach((h, i) => {
+      const v = raw[i] || '';
+      if (/\bname\b|\bassociate\b/.test(h))              obj.name         = v;
+      else if (/status/.test(h))                            obj.status       = v;
+      else if (/current.?dept/.test(h))                     obj.current_dept = v;
+      else if (/home.?dept/.test(h))                        obj.home_dept    = v;
+      else if (/\bsc.?code\b/.test(h))                      obj.sc_code      = v;
+      else if (/win|badge|assoc.+#/.test(h))                obj.win          = v;
+      else if (/shift/.test(h))                             obj.shift        = v;
+      else if (/timestamp|last.?scan/.test(h))              obj.timestamp    = v;
+      else if (/idle.?hour/.test(h))                        obj.idle_hours   = parseFloat(v) || 0;
+      else if (/hours/.test(h))                             obj.total_hours  = parseFloat(v) || 0;
+    });
 
     rows.push(obj);
   });
+
   return { headers, rows };
 }
 """
 
-_ENRICH_JS = """
-() => {
-  const tsRe = /^\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/;
-  const lastTs = Array.from(document.querySelectorAll('.card-body td'))
-    .map(td => td.innerText.trim())
-    .find(t => tsRe.test(t)) || null;
-  const isIn = !!document.querySelector('.card-body .fa-check-circle');
-  const tbodyRows = document.querySelectorAll('table tbody tr');
-  let isOnLunch = false;
-  if (tbodyRows.length > 0) {
-    const lastCells = tbodyRows[tbodyRows.length - 1].querySelectorAll('td');
-    isOnLunch = Array.from(lastCells).some(
-      td => td.innerText.toLowerCase().includes('lunch')
-    );
-  }
-  return { lastTs, isIn, isOnLunch };
-}
-"""
-
-
-# ── Playwright helpers ────────────────────────────────────────────────────────
 
 async def _launch(pw: Any, headless: bool, storage: dict | None = None):
-    lkw: dict[str, Any] = {"headless": headless}
+    kw: dict[str, Any] = {"headless": headless}
     if not headless:
-        lkw["args"] = ["--start-maximized"]
-    ckw: dict[str, Any] = {"viewport": {"width": 1600, "height": 900}}
+        kw["args"] = ["--start-maximized"]
+    ctx_kw: dict[str, Any] = {"viewport": {"width": 1600, "height": 900}}
     if storage:
-        ckw["storage_state"] = storage
+        ctx_kw["storage_state"] = storage
     try:
-        b = await pw.chromium.launch(channel="msedge", **lkw)
+        b = await pw.chromium.launch(channel="msedge", **kw)
     except Exception:
-        b = await pw.chromium.launch(**lkw)
-    return b, await b.new_context(**ckw)
+        b = await pw.chromium.launch(**kw)
+    return b, await b.new_context(**ctx_kw)
 
 
-async def _wait_for_any_datatable(page: Any) -> bool:
-    """Wait until at least one DataTable with rows exists on the page."""
+async def _wait_for_table(page: Any) -> bool:
     try:
-        await page.wait_for_selector("table", timeout=30_000)
         await page.wait_for_function(
             "() => typeof $ !== 'undefined' && "
-            "$('table').filter(function(){ return $.fn.DataTable && "
-            "$.fn.DataTable.isDataTable(this); }).length > 0",
-            timeout=30_000,
+            "$('table').filter(function(){ "
+            "  return $.fn.DataTable && $.fn.DataTable.isDataTable(this); "
+            "}).length > 0",
+            timeout=40_000,
         )
         await page.wait_for_function(
-            "() => { "
-            "  let found = false; "
-            "  $('table').each(function(){ "
-            "    if ($.fn.DataTable.isDataTable(this) && "
-            "        $(this).DataTable().rows().count() > 0) found = true; "
-            "  }); "
-            "  return found; "
-            "}",
-            timeout=30_000,
+            "() => $('table').filter(function(){ "
+            "  return $.fn.DataTable && $.fn.DataTable.isDataTable(this) && "
+            "  $(this).DataTable().rows().count() > 0; "
+            "}).length > 0",
+            timeout=40_000,
         )
         return True
     except Exception:
         return False
 
 
-def _parse_drax_ts(ts: str | None) -> str | None:
-    if not ts:
-        return None
-    try:
-        dt = datetime.strptime(
-            f"{date.today().year}-{ts}", "%Y-%m-%d %H:%M:%S"
-        )
-        return dt.isoformat()
-    except ValueError:
-        return None
-
-
-def _resolve_sc_code(raw: str) -> str | None:
-    """Map a raw SC-code cell value to one of our canonical keys, or None."""
-    key = raw.strip().lower()
-    return _SC_ALIASES.get(key) or _SC_ALIASES.get(raw.strip())
-
-
-# ── Enrichment ────────────────────────────────────────────────────────────────
-
-async def _enrich_one(ctx: Any, row: dict, sem: asyncio.Semaphore) -> None:
-    async with sem:
-        page = await ctx.new_page()
-        try:
-            await page.goto(
-                _assoc_url(row["associate_id"]),
-                wait_until="domcontentloaded",
-                timeout=30_000,
-            )
-            await page.wait_for_selector(".card-body", timeout=15_000)
-            info = await page.evaluate(_ENRICH_JS)
-            row["last_scan_iso"] = _parse_drax_ts(info.get("lastTs"))
-            row["is_clocked_in"] = info.get("isIn", True)
-            row["is_on_lunch"]   = info.get("isOnLunch", False)
-        except Exception as exc:
-            print(f"[WARN] enrich failed for {row.get('name', '?')}: {exc}")
-            row["last_scan_iso"] = None
-            row["is_clocked_in"] = True
-            row["is_on_lunch"]   = False
-        finally:
-            await page.close()
-
-
-# ── Main ──────────────────────────────────────────────────────────────────────
-
 async def main() -> None:
-    after, before = _shift_window()
-    url = _overview_url(after, before)
-    print(f"[INFO] Shift window: {after}  ->  {before}")
-    print(f"[INFO] URL: {url}")
-
     storage = json.loads(AUTH_FILE.read_text()) if AUTH_FILE.exists() else None
+    print(f"[INFO] Navigating to {ASSOC_URL}")
 
     async with async_playwright() as pw:
-        # ── Phase 1: extract building overview table ──────────────────────────
         browser, ctx = await _launch(pw, headless=bool(storage), storage=storage)
         page = await ctx.new_page()
-        await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+        await page.goto(ASSOC_URL, wait_until="domcontentloaded", timeout=60_000)
 
-        # Handle any SSO redirect (not just URLs containing 'login'/'sso')
+        # Handle SSO redirect
         if not page.url.startswith(DRAX_BASE):
-            print(f"[INFO] Redirected to SSO ({page.url[:60]}…) — waiting up to 3 min for login…")
+            print(f"[INFO] SSO redirect detected — waiting up to 3 min for login...")
             await page.wait_for_url(f"{DRAX_BASE}/**", timeout=180_000)
 
-        if not await _wait_for_any_datatable(page):
-            _write_error("Timed out waiting for a DataTable on building_overview")
+        if not await _wait_for_table(page):
+            _write_error("Timed out waiting for associates table on /associates/")
             await browser.close()
             return
 
-        # Discover tables
-        summary = await page.evaluate(_DISCOVER_JS)
-        print(f"[INFO] DataTables found: {summary}")
-
-        # Pick the table with the most rows
-        best = max(summary, key=lambda t: t["rows"]) if summary else None
-        table_id = best["id"] if best else None
-        print(f"[INFO] Using table: id={table_id!r}  rows={best['rows'] if best else 0}")
-
-        payload = await page.evaluate(_EXTRACT_JS, table_id)
-        await page.close()
-
-        all_rows: list[dict] = payload.get("rows", [])
-        headers:  list[str]  = payload.get("headers", [])
-        print(f"[INFO] Phase 1 OK — {len(all_rows)} rows, headers={headers}")
-        # Debug: dump first 5 rows so we can see what sc_code + associate_id look like
-        for i, r in enumerate(all_rows[:5]):
-            print(f"[DEBUG] row[{i}] name={r.get('name')!r} sc_code={r.get('sc_code')!r} "
-                  f"associate_id={r.get('associate_id')!r} raw={r.get('_raw')}")
-
-        # ── Filter to target SC codes ─────────────────────────────────────────
-        targets: list[dict] = []
-        for row in all_rows:
-            sc_raw = row.get("sc_code", "")
-            resolved = _resolve_sc_code(sc_raw)
-            if not resolved:
-                # Also scan raw cells for a match
-                for cell in row.get("_raw", []):
-                    resolved = _resolve_sc_code(cell)
-                    if resolved:
-                        row["sc_code"] = cell
-                        break
-            if resolved and row.get("associate_id"):
-                row["resolved_sc_code"] = resolved
-                targets.append(row)
-
-        print(f"[INFO] Phase 2 — enriching {len(targets)} associates in target codes")
-
-        # ── Phase 2: enrich individual associate pages ────────────────────────
-        sem = asyncio.Semaphore(ENRICH_CONCURRENCY)
-        await asyncio.gather(*[_enrich_one(ctx, r, sem) for r in targets])
-
+        payload = await page.evaluate(_EXTRACT_JS)
         await ctx.storage_state(path=str(AUTH_FILE))
         await browser.close()
 
-    _write_result(targets, after, before)
+    headers = payload.get("headers", [])
+    all_rows = payload.get("rows", [])
+    print(f"[INFO] Got {len(all_rows)} rows — headers: {headers}")
 
+    # Filter: Status=IN and sc_code OR current_dept matches our targets
+    matches = []
+    for row in all_rows:
+        status  = row.get("status", "").strip().upper()
+        sc_code = row.get("sc_code", "").strip()
+        dept    = row.get("current_dept", "").strip().lower()
 
-# ── Output writers ────────────────────────────────────────────────────────────
+        if status != "IN":
+            continue
 
-def _write_result(targets: list[dict], after: str, before: str) -> None:
-    threshold_mins = IDLE_THRESHOLD_HRS * 60
+        # Match by sc_code first (exact), fall back to dept name
+        if sc_code in TARGET_SC_CODES:
+            row["resolved_sc_code"] = sc_code
+        elif any(t in dept for t in TARGET_DEPTS):
+            row["resolved_sc_code"] = "019209516" if "stationary" in dept else "019034514"
+        else:
+            continue
+
+        row["drax_url"] = (
+            f"{DRAX_BASE}/associates/{row['associate_id']}/"
+            if row.get("associate_id") else ASSOC_URL
+        )
+        matches.append(row)
+
+    print(f"[INFO] Filtered to {len(matches)} associates (IN + target dept)")
+
     dept_totals: dict[str, dict] = {
         code: {"label": label, "total": 0, "flagged": 0}
         for code, label in TARGET_SC_CODES.items()
     }
-
-    for row in targets:
+    for row in matches:
         sc = row.get("resolved_sc_code", "")
         if sc in dept_totals:
             dept_totals[sc]["total"] += 1
 
-        last_iso  = row.get("last_scan_iso")
-        idle_mins: float | None = None
-        if last_iso:
-            idle_mins = (
-                datetime.now() - datetime.fromisoformat(last_iso)
-            ).total_seconds() / 60
-
-        row["current_idle_mins"] = idle_mins
-        row["drax_url"]          = _assoc_url(row["associate_id"])
-        row["is_flagged"] = (
-            row.get("is_clocked_in", True)
-            and not row.get("is_on_lunch", False)
-            and idle_mins is not None
-            and idle_mins >= threshold_mins
-        )
-
-        if row["is_flagged"] and sc in dept_totals:
-            dept_totals[sc]["flagged"] += 1
-
-    # Sort: flagged first, then by longest idle
-    targets.sort(key=lambda r: (not r["is_flagged"], -(r.get("current_idle_mins") or 0)))
-
     result = {
-        "associates":   targets,
+        "associates":   matches,
         "dept_totals":  dept_totals,
-        "all_count":    len(targets),
+        "all_count":    len(all_rows),
         "scraped_at":   datetime.now().isoformat(timespec="seconds"),
-        "shift_after":  after,
-        "shift_before": before,
         "error":        None,
     }
     OUT_FILE.write_text(json.dumps(result))
-    print(f"[INFO] Results written → {OUT_FILE}  ({len(targets)} associates)")
+    print(f"[INFO] Done — {len(matches)} associates written to results.json")
 
 
 def _write_error(msg: str) -> None:
-    result = {
+    OUT_FILE.write_text(json.dumps({
         "associates":   [],
         "dept_totals":  {
             code: {"label": label, "total": 0, "flagged": 0}
@@ -415,11 +208,8 @@ def _write_error(msg: str) -> None:
         },
         "all_count":    0,
         "scraped_at":   datetime.now().isoformat(timespec="seconds"),
-        "shift_after":  None,
-        "shift_before": None,
         "error":        msg,
-    }
-    OUT_FILE.write_text(json.dumps(result))
+    }))
     print(f"[ERROR] {msg}")
 
 
