@@ -42,7 +42,11 @@
   <div class="bg-white rounded-2xl p-5 card-shadow border border-blue-100">
     <div class="flex items-center justify-between mb-3">
       <div class="flex items-center gap-2">
-        <div class="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center text-lg">🔵</div>
+        <div class="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center">
+          <svg class="w-6 h-6" viewBox="0 0 32 32" fill="none">
+            <path d="M16 2L18.4 11.6L28 9.2L21.2 16L28 22.8L18.4 20.4L16 30L13.6 20.4L4 22.8L10.8 16L4 9.2L13.6 11.6Z" fill="#ffc220"/>
+          </svg>
+        </div>
         <div>
           <p class="font-bold text-gray-800 text-sm leading-tight">Stationary Picking</p>
           <p class="text-xs text-gray-400 font-mono">019209516</p>
@@ -70,7 +74,11 @@
   <div class="bg-white rounded-2xl p-5 card-shadow border border-yellow-100">
     <div class="flex items-center justify-between mb-3">
       <div class="flex items-center gap-2">
-        <div class="w-9 h-9 bg-yellow-100 rounded-xl flex items-center justify-center text-lg">📦</div>
+        <div class="w-9 h-9 bg-yellow-100 rounded-xl flex items-center justify-center">
+          <svg class="w-6 h-6" viewBox="0 0 32 32" fill="none">
+            <path d="M16 2L18.4 11.6L28 9.2L21.2 16L28 22.8L18.4 20.4L16 30L13.6 20.4L4 22.8L10.8 16L4 9.2L13.6 11.6Z" fill="#ffc220"/>
+          </svg>
+        </div>
         <div>
           <p class="font-bold text-gray-800 text-sm leading-tight">Box Finishing</p>
           <p class="text-xs text-gray-400 font-mono">019034514</p>
@@ -110,7 +118,11 @@
       {% if accent == 'blue' %}bg-gradient-to-r from-blue-600 to-blue-500
       {% else %}bg-gradient-to-r from-yellow-500 to-yellow-400{% endif %}">
       <div class="flex items-center gap-2">
-        <span class="text-base">{{ icon }}</span>
+          <span>
+            <svg class="w-5 h-5 inline" viewBox="0 0 32 32" fill="none">
+              <path d="M16 2L18.4 11.6L28 9.2L21.2 16L28 22.8L18.4 20.4L16 30L13.6 20.4L4 22.8L10.8 16L4 9.2L13.6 11.6Z" fill="#ffc220"/>
+            </svg>
+          </span>
         <span class="font-bold text-white text-sm">{{ title }}</span>
       </div>
       <span class="bg-white/20 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
