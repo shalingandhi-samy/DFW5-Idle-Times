@@ -193,9 +193,9 @@ async def main() -> None:
         else:
             continue
 
-        # Compute elapsed seconds server-side — no browser timezone needed
+        # Server clock is Eastern, DRAX timestamps are Central — subtract 1 hr
         ts_dt = _parse_drax_ts(row.get("timestamp"))
-        row["elapsed_secs"] = int((now - ts_dt).total_seconds()) if ts_dt else None
+        row["elapsed_secs"] = max(0, int((now - ts_dt).total_seconds()) - 3600) if ts_dt else None
 
         row["drax_url"] = (
             f"{DRAX_BASE}/associates/{row['associate_id']}/"
