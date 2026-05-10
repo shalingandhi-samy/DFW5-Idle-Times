@@ -23,6 +23,8 @@ TARGET_SC_CODES: dict[str, str] = {
     "019209516": "Stationary Picking",
     "019034514": "Box Finishing",
     "019034295": "Bagging - Manual",
+    "019357098": "CPS Packing",
+    "002172268": "Special Picking",
 }
 
 
