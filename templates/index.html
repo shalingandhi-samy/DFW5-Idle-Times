@@ -9,79 +9,90 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <style>
-    :root {
-      --wmt-blue:       #0053e2;
-      --wmt-blue-dark:  #003db3;
-      --wmt-spark:      #ffc220;
-      --wmt-green:      #2a8703;
-      --wmt-red:        #ea1100;
-    }
-    body { font-family: 'Inter', system-ui, sans-serif; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #0b0f1a; color: #e2e8f0; }
 
     .header-gradient {
-      background: linear-gradient(135deg, #002a8f 0%, #0053e2 60%, #1a6fff 100%);
+      background: linear-gradient(135deg, #040812 0%, #001a5e 50%, #0035b3 100%);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
     }
-    .card-shadow { box-shadow: 0 4px 24px rgba(0,83,226,0.10), 0 1px 4px rgba(0,0,0,0.06); }
-    .table-shadow { box-shadow: 0 2px 16px rgba(0,0,0,0.07); }
+
+    .card-dark {
+      background: #141927;
+      border: 1px solid #1e2d45;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+
+    .table-dark {
+      background: #141927;
+      border: 1px solid #1e2d45;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+
+    .thead-dark { background: #0b0f1a; }
+    .row-hover:hover { background: rgba(255,255,255,0.04); }
+
+    /* Left-border status indicators */
+    .row-green  { border-left: 4px solid #22c55e; }
+    .row-yellow { border-left: 4px solid #f59e0b; }
+    .row-red    { border-left: 4px solid #ef4444; }
+
+    /* Dividers */
+    .divide-dark > tr { border-bottom: 1px solid #1e2d45; }
 
     /* Spinner */
     #spinner { display: none; }
     .htmx-request #spinner { display: inline-flex; }
 
-    /* Live pulse dot */
+    /* Live pulse */
     @keyframes pulse-dot {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50%       { opacity: 0.5; transform: scale(0.8); }
+      50%       { opacity: 0.4; transform: scale(0.75); }
     }
     .live-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
 
-    /* Row left-border color indicator */
-    .row-green { border-left: 4px solid #2a8703; }
-    .row-yellow { border-left: 4px solid #f59e0b; }
-    .row-red    { border-left: 4px solid #ea1100; }
-
-    /* Scrollbar styling */
-    .styled-table tbody { display: block; max-height: 480px; overflow-y: auto; }
+    /* Scrollable table body */
+    .styled-table tbody { display: block; max-height: 500px; overflow-y: auto; }
     .styled-table thead, .styled-table tbody tr { display: table; width: 100%; table-layout: fixed; }
     .styled-table tbody::-webkit-scrollbar { width: 4px; }
-    .styled-table tbody::-webkit-scrollbar-track { background: #f1f5f9; }
-    .styled-table tbody::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+    .styled-table tbody::-webkit-scrollbar-track { background: #0b0f1a; }
+    .styled-table tbody::-webkit-scrollbar-thumb { background: #1e2d45; border-radius: 2px; }
   </style>
 </head>
-<body class="bg-slate-100 min-h-screen text-gray-800">
+<body class="min-h-screen">
 
   <!-- ── Header ────────────────────────────────────────────────────────────── -->
-  <header class="header-gradient text-white shadow-xl">
+  <header class="header-gradient">
     <div class="max-w-7xl mx-auto px-6 py-5">
       <div class="flex items-center justify-between">
 
-        <!-- Left: Brand + title -->
+        <!-- Brand -->
         <div class="flex items-center gap-4">
-          <div class="bg-white/10 backdrop-blur rounded-2xl p-2.5">
+          <div class="bg-white/5 border border-white/10 rounded-2xl p-2.5">
             <img src="/static/spark.svg" class="w-9 h-9" alt="Walmart Spark"/>
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <h1 class="text-2xl font-extrabold tracking-tight">DFW5 Idle Times</h1>
-              <!-- LIVE badge -->
-              <span class="flex items-center gap-1 bg-white/15 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full border border-white/25">
+              <h1 class="text-2xl font-extrabold tracking-tight text-white">DFW5 Idle Times</h1>
+              <span class="flex items-center gap-1.5 bg-green-500/10 border border-green-500/30
+                           text-green-400 text-xs font-semibold px-2.5 py-0.5 rounded-full">
                 <span class="live-dot w-1.5 h-1.5 bg-green-400 rounded-full inline-block"></span>
                 LIVE
               </span>
             </div>
-            <p class="text-blue-200 text-sm mt-0.5 font-medium">
+            <p class="text-slate-400 text-sm mt-0.5 font-medium">
               Stationary Picking &amp; Box Finishing &nbsp;·&nbsp; DFW5 Fulfillment Center
             </p>
           </div>
         </div>
 
-        <!-- Right: controls -->
+        <!-- Controls -->
         <div class="flex items-center gap-3">
-          <span id="spinner" class="items-center justify-center w-5 h-5
-            border-2 border-white/40 border-t-white rounded-full animate-spin">
+          <span id="spinner"
+            class="items-center justify-center w-5 h-5
+                   border-2 border-slate-600 border-t-blue-400 rounded-full animate-spin">
           </span>
-          <div class="text-right text-xs text-blue-200 hidden sm:block">
-            <div id="next-refresh" class="font-mono">Next refresh in --:--</div>
+          <div class="text-right text-xs text-slate-500 hidden sm:block">
+            <div id="next-refresh" class="font-mono text-slate-400">Next refresh in --:--</div>
             <div>Auto every {{ refresh_secs // 60 }} min</div>
           </div>
           <button
@@ -89,9 +100,9 @@
             hx-target="#dashboard-content"
             hx-swap="innerHTML"
             hx-indicator="#spinner"
-            class="flex items-center gap-2 bg-white text-blue-700 font-semibold
-                   px-4 py-2 rounded-xl text-sm shadow-lg
-                   hover:bg-blue-50 active:scale-95 transition-all duration-150">
+            class="flex items-center gap-2 bg-blue-600 hover:bg-blue-500
+                   text-white font-semibold px-4 py-2 rounded-xl text-sm shadow-lg
+                   active:scale-95 transition-all duration-150 border border-blue-500">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round"
                 d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/>
@@ -104,7 +115,7 @@
       <!-- SC code pills -->
       <div class="flex flex-wrap gap-2 mt-4">
         {% for code, label in target_codes.items() %}
-        <span class="bg-white/10 border border-white/20 text-white/90
+        <span class="bg-white/5 border border-white/10 text-slate-300
                      text-xs font-mono px-3 py-1 rounded-full">
           {{ label }} · {{ code }}
         </span>
@@ -126,11 +137,13 @@
   </main>
 
   <!-- ── Footer ─────────────────────────────────────────────────────────────── -->
-  <footer class="max-w-7xl mx-auto px-6 pb-8 text-center text-xs text-gray-400">
-    <div class="border-t border-gray-200 pt-4">
+  <footer class="max-w-7xl mx-auto px-6 pb-8 text-center text-xs text-slate-600">
+    <div class="border-t border-slate-800 pt-4">
       Data source:
       <a href="https://drax.walmart.com/associates/" target="_blank"
-         class="text-blue-500 hover:underline">drax.walmart.com/associates</a>
+         class="text-blue-500 hover:text-blue-400 hover:underline transition-colors">
+        drax.walmart.com/associates
+      </a>
       &nbsp;·&nbsp; DFW5 FC &nbsp;·&nbsp; Built with Code Puppy 🐶
     </div>
   </footer>

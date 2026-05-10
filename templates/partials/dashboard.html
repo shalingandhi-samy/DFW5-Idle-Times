@@ -7,29 +7,31 @@
 
 <!-- ── Meta bar ─────────────────────────────────────────────────────────────── -->
 <div class="flex items-center justify-between mb-5 text-sm">
-  <div class="flex items-center gap-2 text-gray-500">
+  <div class="flex items-center gap-2 text-slate-500">
     {% if scraped_at %}
       <span class="w-2 h-2 bg-green-500 rounded-full inline-block"></span>
-      <span>Updated <strong class="text-gray-700">{{ scraped_at.replace("T"," ") }}</strong></span>
-      <span class="text-gray-300">·</span>
+      <span>Updated <strong class="text-slate-300">{{ scraped_at.replace("T"," ") }}</strong></span>
+      <span class="text-slate-700">·</span>
       <span>{{ associates | length }} associates tracked</span>
     {% else %}
       <span class="w-2 h-2 bg-yellow-400 rounded-full inline-block animate-pulse"></span>
-      <span class="italic text-gray-400">Waiting for first scrape…</span>
+      <span class="italic text-slate-600">Waiting for first scrape…</span>
     {% endif %}
   </div>
-  <span id="next-refresh" class="font-mono text-xs text-gray-400 bg-white px-3 py-1 rounded-full border border-gray-200 shadow-sm"></span>
+  <span id="next-refresh"
+    class="font-mono text-xs text-slate-500 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
+  </span>
 </div>
 
 <!-- ── Banners ─────────────────────────────────────────────────────────────── -->
 {% if refreshing %}
-<div class="flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-2xl px-5 py-3.5 mb-5 shadow-sm">
-  <div class="w-4 h-4 border-2 border-blue-300 border-t-blue-700 rounded-full animate-spin flex-shrink-0"></div>
-  <p class="text-sm font-medium">Scraping DRAX in the background — data updates when ready (~30 sec).</p>
+<div class="flex items-center gap-3 bg-blue-950 border border-blue-800 text-blue-300 rounded-2xl px-5 py-3.5 mb-5">
+  <div class="w-4 h-4 border-2 border-blue-700 border-t-blue-300 rounded-full animate-spin flex-shrink-0"></div>
+  <p class="text-sm font-medium">Scraping DRAX in the background — updates when ready (~30 sec).</p>
 </div>
 {% endif %}
 {% if error %}
-<div class="flex items-start gap-3 bg-red-50 border border-red-200 text-red-800 rounded-2xl px-5 py-3.5 mb-5 shadow-sm">
+<div class="flex items-start gap-3 bg-red-950 border border-red-800 text-red-300 rounded-2xl px-5 py-3.5 mb-5">
   <span class="text-xl mt-0.5">⚠️</span>
   <div><p class="font-semibold">Scrape error</p><p class="text-sm font-mono">{{ error }}</p></div>
 </div>
@@ -38,144 +40,136 @@
 <!-- ── Summary cards ───────────────────────────────────────────────────────── -->
 <div class="grid grid-cols-2 gap-4 mb-6">
 
-  <!-- Stationary Picking card -->
-  <div class="bg-white rounded-2xl p-5 card-shadow border border-blue-100">
-    <div class="flex items-center justify-between mb-3">
-      <div class="flex items-center gap-2">
-        <div class="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center">
-          <img src="/static/spark.svg" class="w-6 h-6" alt="Walmart Spark"/>
+  <!-- Stationary Picking -->
+  <div class="card-dark rounded-2xl p-5">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-blue-500/10 border border-blue-500/20 rounded-xl
+                    flex items-center justify-center">
+          <img src="/static/spark.svg" class="w-6 h-6" alt="Spark"/>
         </div>
         <div>
-          <p class="font-bold text-gray-800 text-sm leading-tight">Stationary Picking</p>
-          <p class="text-xs text-gray-400 font-mono">019209516</p>
+          <p class="font-bold text-slate-100 text-sm">Stationary Picking</p>
+          <p class="text-xs text-slate-500 font-mono">019209516</p>
         </div>
       </div>
-      <div class="text-4xl font-extrabold text-blue-600">{{ sp_list | length }}</div>
+      <div class="text-5xl font-extrabold text-blue-400">{{ sp_list | length }}</div>
     </div>
-    <div class="flex gap-2 text-xs font-semibold">
-      <span class="flex items-center gap-1 bg-green-100 text-green-700 px-2.5 py-1 rounded-full">
+    <div class="flex gap-2 text-xs font-semibold flex-wrap">
+      <span class="flex items-center gap-1 bg-green-500/10 border border-green-500/20 text-green-400 px-2.5 py-1 rounded-full">
         <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-        {{ sp_list | length - sp_yellow - sp_red }} OK
+        {{ sp_list | length - sp_yellow - sp_red }} Active
       </span>
-      <span class="flex items-center gap-1 bg-yellow-100 text-yellow-700 px-2.5 py-1 rounded-full">
+      <span class="flex items-center gap-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 px-2.5 py-1 rounded-full">
         <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>
-        {{ sp_yellow }} Warning
+        {{ sp_yellow }} Watch
       </span>
-      <span class="flex items-center gap-1 bg-red-100 text-red-700 px-2.5 py-1 rounded-full">
+      <span class="flex items-center gap-1 bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-1 rounded-full">
         <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
         {{ sp_red }} Alert
       </span>
     </div>
   </div>
 
-  <!-- Box Finishing card -->
-  <div class="bg-white rounded-2xl p-5 card-shadow border border-yellow-100">
-    <div class="flex items-center justify-between mb-3">
-      <div class="flex items-center gap-2">
-        <div class="w-9 h-9 bg-yellow-100 rounded-xl flex items-center justify-center">
-          <img src="/static/spark.svg" class="w-6 h-6" alt="Walmart Spark"/>
+  <!-- Box Finishing -->
+  <div class="card-dark rounded-2xl p-5">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-yellow-500/10 border border-yellow-500/20 rounded-xl
+                    flex items-center justify-center">
+          <img src="/static/spark.svg" class="w-6 h-6" alt="Spark"/>
         </div>
         <div>
-          <p class="font-bold text-gray-800 text-sm leading-tight">Box Finishing</p>
-          <p class="text-xs text-gray-400 font-mono">019034514</p>
+          <p class="font-bold text-slate-100 text-sm">Box Finishing</p>
+          <p class="text-xs text-slate-500 font-mono">019034514</p>
         </div>
       </div>
-      <div class="text-4xl font-extrabold text-yellow-600">{{ bf_list | length }}</div>
+      <div class="text-5xl font-extrabold text-yellow-400">{{ bf_list | length }}</div>
     </div>
-    <div class="flex gap-2 text-xs font-semibold">
-      <span class="flex items-center gap-1 bg-green-100 text-green-700 px-2.5 py-1 rounded-full">
+    <div class="flex gap-2 text-xs font-semibold flex-wrap">
+      <span class="flex items-center gap-1 bg-green-500/10 border border-green-500/20 text-green-400 px-2.5 py-1 rounded-full">
         <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-        {{ bf_list | length - bf_yellow - bf_red }} OK
+        {{ bf_list | length - bf_yellow - bf_red }} Active
       </span>
-      <span class="flex items-center gap-1 bg-yellow-100 text-yellow-700 px-2.5 py-1 rounded-full">
+      <span class="flex items-center gap-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 px-2.5 py-1 rounded-full">
         <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>
-        {{ bf_yellow }} Warning
+        {{ bf_yellow }} Watch
       </span>
-      <span class="flex items-center gap-1 bg-red-100 text-red-700 px-2.5 py-1 rounded-full">
+      <span class="flex items-center gap-1 bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-1 rounded-full">
         <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
         {{ bf_red }} Alert
       </span>
     </div>
   </div>
+
 </div>
 
 <!-- ── Associate tables ────────────────────────────────────────────────────── -->
 {% if associates %}
 <div class="grid grid-cols-2 gap-5">
 
-  {% for dept_list, title, icon, accent in [
-    (sp_list, 'Stationary Picking', '🔵', 'blue'),
-    (bf_list, 'Box Finishing',      '📦', 'yellow')
+  {% for dept_list, title, accent_text, accent_border in [
+    (sp_list, 'Stationary Picking', 'text-blue-400',   'border-blue-500/30'),
+    (bf_list, 'Box Finishing',      'text-yellow-400',  'border-yellow-500/30')
   ] %}
-  <div class="bg-white rounded-2xl table-shadow overflow-hidden border border-gray-100">
+  <div class="table-dark rounded-2xl overflow-hidden">
 
     <!-- Card header -->
-    <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between
-      {% if accent == 'blue' %}bg-gradient-to-r from-blue-600 to-blue-500
-      {% else %}bg-gradient-to-r from-yellow-500 to-yellow-400{% endif %}">
-      <div class="flex items-center gap-2">
-          <span>
-            <img src="/static/spark.svg" class="w-5 h-5 inline" alt="Walmart Spark"/>
-          </span>
-        <span class="font-bold text-white text-sm">{{ title }}</span>
+    <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <img src="/static/spark.svg" class="w-5 h-5" alt="Spark"/>
+        <span class="font-bold text-slate-100 text-sm">{{ title }}</span>
       </div>
-      <span class="bg-white/20 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
-        {{ dept_list | length }}
+      <span class="text-xs font-bold px-2.5 py-0.5 rounded-full border {{ accent_border }} {{ accent_text }}
+                   bg-white/5">
+        {{ dept_list | length }} associates
       </span>
     </div>
 
     <!-- Table -->
     <table class="w-full text-sm styled-table">
       <thead>
-        <tr class="bg-gray-50 text-gray-400 text-xs uppercase tracking-wider">
-          <th class="px-4 py-2.5 text-center w-10">#</th>
-          <th class="px-4 py-2.5 text-left">Name</th>
-          <th class="px-4 py-2.5 text-center">Last Scan</th>
-          <th class="px-4 py-2.5 text-center">Idle Time</th>
-          <th class="px-4 py-2.5 text-center w-12"></th>
+        <tr class="thead-dark text-slate-500 text-xs uppercase tracking-wider">
+          <th class="px-4 py-3 text-center w-10">#</th>
+          <th class="px-4 py-3 text-left">Name</th>
+          <th class="px-4 py-3 text-center">Last Scan</th>
+          <th class="px-4 py-3 text-center">Idle Time</th>
+          <th class="px-4 py-3 text-center w-10"></th>
         </tr>
       </thead>
-      <tbody>
+      <tbody class="divide-dark">
         {% for a in dept_list %}
         {% set secs = a.elapsed_secs or 0 %}
         {% if secs >= 1800 %}
           {% set border = 'row-red' %}
-          {% set badge  = 'bg-red-100 text-red-700' %}
-          {% set bg     = 'bg-red-50/60' %}
+          {% set badge  = 'bg-red-500/15 text-red-400 border border-red-500/30' %}
         {% elif secs >= 900 %}
           {% set border = 'row-yellow' %}
-          {% set badge  = 'bg-yellow-100 text-yellow-700' %}
-          {% set bg     = 'bg-yellow-50/60' %}
+          {% set badge  = 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30' %}
         {% else %}
           {% set border = 'row-green' %}
-          {% set badge  = 'bg-green-100 text-green-700' %}
-          {% set bg     = 'bg-white' %}
+          {% set badge  = 'bg-green-500/15 text-green-400 border border-green-500/30' %}
         {% endif %}
 
-        <tr class="{{ border }} {{ bg }} hover:brightness-95 transition-all duration-150">
-          <!-- Rank -->
-          <td class="px-3 py-2.5 text-center">
-            <span class="text-xs font-bold text-gray-300">{{ loop.index }}</span>
+        <tr class="{{ border }} row-hover transition-colors duration-100">
+          <td class="px-3 py-3 text-center">
+            <span class="text-xs font-bold text-slate-600">{{ loop.index }}</span>
           </td>
-          <!-- Name -->
-          <td class="px-4 py-2.5">
-            <span class="font-semibold text-gray-800 text-sm">{{ a.name or '—' }}</span>
+          <td class="px-4 py-3">
+            <span class="font-semibold text-slate-100 text-sm">{{ a.name or '—' }}</span>
           </td>
-          <!-- Last scan timestamp -->
-          <td class="px-4 py-2.5 text-center">
-            <span class="font-mono text-xs text-gray-500">{{ a.timestamp or '—' }}</span>
+          <td class="px-4 py-3 text-center">
+            <span class="font-mono text-xs text-slate-500">{{ a.timestamp or '—' }}</span>
           </td>
-          <!-- Idle timer badge -->
-          <td class="px-4 py-2.5 text-center">
+          <td class="px-4 py-3 text-center">
             <span class="elapsed-timer inline-block font-mono font-bold text-xs
                          px-2.5 py-1 rounded-full {{ badge }}"
                   data-elapsed="{{ a.elapsed_secs or 0 }}">…</span>
           </td>
-          <!-- DRAX link -->
-          <td class="px-3 py-2.5 text-center">
+          <td class="px-3 py-3 text-center">
             {% if a.drax_url and a.associate_id %}
             <a href="{{ a.drax_url }}" target="_blank"
-               class="text-gray-300 hover:text-blue-500 transition-colors" title="Open in DRAX">
+               class="text-slate-600 hover:text-blue-400 transition-colors" title="Open in DRAX">
               <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round"
                   d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/>
@@ -185,7 +179,11 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="5" class="px-5 py-6 text-center text-sm text-gray-300 italic">No associates found</td></tr>
+        <tr>
+          <td colspan="5" class="px-5 py-8 text-center text-sm text-slate-600 italic">
+            No associates found
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
@@ -196,22 +194,22 @@
 </div>
 
 <!-- ── Legend ──────────────────────────────────────────────────────────────── -->
-<div class="flex items-center justify-center gap-6 mt-5 text-xs text-gray-400 font-medium">
+<div class="flex items-center justify-center gap-6 mt-5 text-xs text-slate-600 font-medium">
   <span class="flex items-center gap-1.5">
-    <span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span> &lt; 15 min — Active
+    <span class="w-3 h-0.5 bg-green-500 rounded inline-block"></span> &lt; 15 min — Active
   </span>
   <span class="flex items-center gap-1.5">
-    <span class="w-3 h-3 rounded-full bg-yellow-400 inline-block"></span> 15–29 min — Watch
+    <span class="w-3 h-0.5 bg-yellow-400 rounded inline-block"></span> 15–29 min — Watch
   </span>
   <span class="flex items-center gap-1.5">
-    <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span> 30+ min — Alert
+    <span class="w-3 h-0.5 bg-red-500 rounded inline-block"></span> 30+ min — Alert
   </span>
 </div>
 
 {% elif not error %}
-<div class="flex flex-col items-center justify-center py-24 text-gray-300">
-  <div class="w-12 h-12 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin mb-5"></div>
-  <p class="text-base font-medium text-gray-400">Connecting to DRAX…</p>
-  <p class="text-sm mt-1">An Edge browser window may open for SSO login.</p>
+<div class="flex flex-col items-center justify-center py-24 text-slate-600">
+  <div class="w-12 h-12 border-4 border-slate-800 border-t-blue-500 rounded-full animate-spin mb-5"></div>
+  <p class="text-base font-medium text-slate-400">Connecting to DRAX…</p>
+  <p class="text-sm mt-1 text-slate-600">An Edge browser window may open for SSO login.</p>
 </div>
 {% endif %}
