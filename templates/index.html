@@ -153,7 +153,8 @@
     const REFRESH_SECS = {{ refresh_secs }};
     let _countdown = REFRESH_SECS;
     function _tickCountdown() {
-      _countdown = Math.max(0, _countdown - 1);
+      _countdown--;
+      if (_countdown < 0) _countdown = REFRESH_SECS;
       const mm = String(Math.floor(_countdown / 60)).padStart(2, '0');
       const ss = String(_countdown % 60).padStart(2, '0');
       const el = document.getElementById('next-refresh');
@@ -190,7 +191,6 @@
 
     document.addEventListener('DOMContentLoaded', _startElapsedTimers);
     document.body.addEventListener('htmx:afterSwap', () => {
-      _countdown = REFRESH_SECS;
       _startElapsedTimers();
     });
   </script>
