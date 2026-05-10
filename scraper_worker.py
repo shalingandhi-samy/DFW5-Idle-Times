@@ -68,20 +68,31 @@ _EXTRACT_JS = """
       obj.associate_id = null;
     }
 
-    // Map headers to fields
-    headers.forEach((h, i) => {
-      const v = raw[i] || '';
-      if (/\bname\b|\bassociate\b/.test(h))              obj.name         = v;
-      else if (/status/.test(h))                            obj.status       = v;
-      else if (/current.?dept/.test(h))                     obj.current_dept = v;
-      else if (/home.?dept/.test(h))                        obj.home_dept    = v;
-      else if (/\bsc.?code\b/.test(h))                      obj.sc_code      = v;
-      else if (/win|badge|assoc.+#/.test(h))                obj.win          = v;
-      else if (/shift/.test(h))                             obj.shift        = v;
-      else if (/timestamp|last.?scan/.test(h))              obj.timestamp    = v;
-      else if (/idle.?hour/.test(h))                        obj.idle_hours   = parseFloat(v) || 0;
-      else if (/hours/.test(h))                             obj.total_hours  = parseFloat(v) || 0;
-    });
+    // Map headers to fields — exact string match avoids regex escape issues
+      const fieldMap = {
+        'name':           'name',
+        'associate':      'name',
+        'status':         'status',
+        'shift':          'shift',
+        'sc code':        'sc_code',
+        'sc_code':        'sc_code',
+        'win':            'win',
+        'timestamp':      'timestamp',
+      };
+      headers.forEach((h, i) => {
+        const v = raw[i] || '';
+        if (fieldMap[h]) {
+          obj[fieldMap[h]] = v;
+        } else if (h.includes('current') && h.includes('dept')) {
+          obj.current_dept = v;
+        } else if (h.includes('assoc') && h.includes('#')) {
+          obj.win = v;
+        } else if (h.includes('idle') && h.includes('hour')) {
+          obj.idle_hours = parseFloat(v) || 0;
+        } else if (h.includes('hour')) {
+          obj.total_hours = parseFloat(v) || 0;
+        }
+      });
 
     rows.push(obj);
   });
