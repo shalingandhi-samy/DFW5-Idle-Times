@@ -205,6 +205,9 @@ async def main() -> None:
 
     print(f"[INFO] Filtered to {len(matches)} associates (IN + target dept)")
 
+    # Highest idle time first within each dept
+    matches.sort(key=lambda r: r.get("elapsed_secs") or 0, reverse=True)
+
     dept_totals: dict[str, dict] = {
         code: {"label": label, "total": 0, "flagged": 0}
         for code, label in TARGET_SC_CODES.items()
