@@ -6,74 +6,118 @@
   <title>DFW5 Idle Times</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <style>
     :root {
-      --wmt-blue:  #0053e2;
-      --wmt-spark: #ffc220;
-      --wmt-red:   #ea1100;
-      --wmt-green: #2a8703;
+      --wmt-blue:       #0053e2;
+      --wmt-blue-dark:  #003db3;
+      --wmt-spark:      #ffc220;
+      --wmt-green:      #2a8703;
+      --wmt-red:        #ea1100;
     }
-    .bg-wmt-blue   { background-color: var(--wmt-blue); }
-    .text-wmt-blue { color: var(--wmt-blue); }
-    .bg-wmt-spark  { background-color: var(--wmt-spark); }
-    .border-wmt-blue { border-color: var(--wmt-blue); }
+    body { font-family: 'Inter', system-ui, sans-serif; }
+
+    .header-gradient {
+      background: linear-gradient(135deg, #002a8f 0%, #0053e2 60%, #1a6fff 100%);
+    }
+    .card-shadow { box-shadow: 0 4px 24px rgba(0,83,226,0.10), 0 1px 4px rgba(0,0,0,0.06); }
+    .table-shadow { box-shadow: 0 2px 16px rgba(0,0,0,0.07); }
+
+    /* Spinner */
     #spinner { display: none; }
-    .htmx-request #spinner { display: inline-block; }
+    .htmx-request #spinner { display: inline-flex; }
+
+    /* Live pulse dot */
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(0.8); }
+    }
+    .live-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+
+    /* Row left-border color indicator */
+    .row-green { border-left: 4px solid #2a8703; }
+    .row-yellow { border-left: 4px solid #f59e0b; }
+    .row-red    { border-left: 4px solid #ea1100; }
+
+    /* Scrollbar styling */
+    .styled-table tbody { display: block; max-height: 480px; overflow-y: auto; }
+    .styled-table thead, .styled-table tbody tr { display: table; width: 100%; table-layout: fixed; }
+    .styled-table tbody::-webkit-scrollbar { width: 4px; }
+    .styled-table tbody::-webkit-scrollbar-track { background: #f1f5f9; }
+    .styled-table tbody::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen font-sans text-gray-800">
+<body class="bg-slate-100 min-h-screen text-gray-800">
 
-  <!-- ── Header ──────────────────────────────────────────────────────────── -->
-  <header class="bg-wmt-blue text-white shadow-md">
-    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <svg class="w-8 h-8" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M16 2L18.4 11.6L28 9.2L21.2 16L28 22.8L18.4 20.4L16 30L13.6 20.4L4 22.8L10.8 16L4 9.2L13.6 11.6Z"
-                fill="#ffc220"/>
-        </svg>
-        <div>
-          <h1 class="text-xl font-bold leading-tight">DFW5 Idle Times</h1>
-          <p class="text-blue-200 text-sm">
-            Stationary Pick &amp; Box Finishing
-            {% if shift_after and shift_before %}
-              &nbsp;·&nbsp; Shift {{ shift_after[11:] }} – {{ shift_before[11:] }}
-            {% endif %}
-            &nbsp;·&nbsp; Alert &gt; {{ threshold_label }} idle
-          </p>
+  <!-- ── Header ────────────────────────────────────────────────────────────── -->
+  <header class="header-gradient text-white shadow-xl">
+    <div class="max-w-7xl mx-auto px-6 py-5">
+      <div class="flex items-center justify-between">
+
+        <!-- Left: Brand + title -->
+        <div class="flex items-center gap-4">
+          <div class="bg-white/10 backdrop-blur rounded-2xl p-2.5">
+            <svg class="w-9 h-9" viewBox="0 0 32 32" fill="none">
+              <path d="M16 2L18.4 11.6L28 9.2L21.2 16L28 22.8L18.4 20.4L16 30L13.6 20.4L4 22.8L10.8 16L4 9.2L13.6 11.6Z"
+                    fill="#ffc220"/>
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-2xl font-extrabold tracking-tight">DFW5 Idle Times</h1>
+              <!-- LIVE badge -->
+              <span class="flex items-center gap-1 bg-white/15 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full border border-white/25">
+                <span class="live-dot w-1.5 h-1.5 bg-green-400 rounded-full inline-block"></span>
+                LIVE
+              </span>
+            </div>
+            <p class="text-blue-200 text-sm mt-0.5 font-medium">
+              Stationary Picking &amp; Box Finishing &nbsp;·&nbsp; DFW5 Fulfillment Center
+            </p>
+          </div>
+        </div>
+
+        <!-- Right: controls -->
+        <div class="flex items-center gap-3">
+          <span id="spinner" class="items-center justify-center w-5 h-5
+            border-2 border-white/40 border-t-white rounded-full animate-spin">
+          </span>
+          <div class="text-right text-xs text-blue-200 hidden sm:block">
+            <div id="next-refresh" class="font-mono">Next refresh in --:--</div>
+            <div>Auto every {{ refresh_secs // 60 }} min</div>
+          </div>
+          <button
+            hx-post="/refresh"
+            hx-target="#dashboard-content"
+            hx-swap="innerHTML"
+            hx-indicator="#spinner"
+            class="flex items-center gap-2 bg-white text-blue-700 font-semibold
+                   px-4 py-2 rounded-xl text-sm shadow-lg
+                   hover:bg-blue-50 active:scale-95 transition-all duration-150">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/>
+            </svg>
+            Refresh
+          </button>
         </div>
       </div>
 
-      <div class="flex items-center gap-4">
-        <span id="spinner"
-          class="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin">
+      <!-- SC code pills -->
+      <div class="flex flex-wrap gap-2 mt-4">
+        {% for code, label in target_codes.items() %}
+        <span class="bg-white/10 border border-white/20 text-white/90
+                     text-xs font-mono px-3 py-1 rounded-full">
+          {{ label }} · {{ code }}
         </span>
-        <button
-          hx-post="/refresh"
-          hx-target="#dashboard-content"
-          hx-swap="innerHTML"
-          hx-indicator="#spinner"
-          class="bg-white text-wmt-blue font-semibold px-4 py-2 rounded-lg text-sm
-                 hover:bg-blue-50 active:bg-blue-100 transition-colors shadow">
-          ↻ Refresh Now
-        </button>
+        {% endfor %}
       </div>
     </div>
   </header>
 
-  <!-- ── Monitored codes pill bar ────────────────────────────────────────── -->
-  <div class="max-w-7xl mx-auto px-6 pt-4 flex flex-wrap gap-2 items-center">
-    {% for code, label in target_codes.items() %}
-    <span class="bg-blue-100 text-wmt-blue text-xs font-mono px-3 py-1 rounded-full border border-blue-200">
-      {{ label }} · {{ code }}
-    </span>
-    {% endfor %}
-    <span class="bg-yellow-50 text-yellow-800 text-xs px-3 py-1 rounded-full border border-yellow-200 ml-auto">
-      Auto-refresh every {{ (refresh_secs // 60) }} min
-    </span>
-  </div>
-
-  <!-- ── HTMX-polled dashboard ────────────────────────────────────────────── -->
-  <main class="max-w-7xl mx-auto px-6 py-4">
+  <!-- ── Dashboard ──────────────────────────────────────────────────────────── -->
+  <main class="max-w-7xl mx-auto px-6 py-6">
     <div
       id="dashboard-content"
       hx-get="/data"
@@ -84,19 +128,20 @@
     </div>
   </main>
 
-  <!-- ── Footer ──────────────────────────────────────────────────────────── -->
-  <footer class="max-w-7xl mx-auto px-6 py-6 text-center text-xs text-gray-400">
-    Data source:
-    <a href="https://drax.walmart.com/building_overview/" target="_blank"
-       class="text-wmt-blue underline">drax.walmart.com/building_overview</a>
-    &nbsp;·&nbsp; DFW5 FC &nbsp;·&nbsp; Threshold: {{ threshold_label }} idle
+  <!-- ── Footer ─────────────────────────────────────────────────────────────── -->
+  <footer class="max-w-7xl mx-auto px-6 pb-8 text-center text-xs text-gray-400">
+    <div class="border-t border-gray-200 pt-4">
+      Data source:
+      <a href="https://drax.walmart.com/associates/" target="_blank"
+         class="text-blue-500 hover:underline">drax.walmart.com/associates</a>
+      &nbsp;·&nbsp; DFW5 FC &nbsp;·&nbsp; Built with Code Puppy 🐶
+    </div>
   </footer>
 
   <script>
-    // ── Countdown to next auto-refresh ──────────────────────────────────────
+    // ── Countdown ──────────────────────────────────────────────────────────────
     const REFRESH_SECS = {{ refresh_secs }};
     let _countdown = REFRESH_SECS;
-
     function _tickCountdown() {
       _countdown = Math.max(0, _countdown - 1);
       const mm = String(Math.floor(_countdown / 60)).padStart(2, '0');
@@ -106,14 +151,7 @@
     }
     setInterval(_tickCountdown, 1000);
 
-    document.body.addEventListener('htmx:afterSwap', () => {
-      _countdown = REFRESH_SECS;
-      _startIdleTimers();
-    });
-
-    // ── Elapsed timers ───────────────────────────────────────────────────────
-    // elapsed_secs is computed server-side — no browser timezone issues.
-    // JS just adds seconds elapsed since page load / last HTMX swap.
+    // ── Elapsed timers ─────────────────────────────────────────────────────────
     function _fmtElapsed(secs) {
       if (secs < 0) secs = 0;
       const h = Math.floor(secs / 3600);
@@ -121,7 +159,7 @@
       const s = Math.floor(secs % 60);
       return (h ? `${h}h ` : '') +
              (h || m ? `${String(m).padStart(2,'0')}m ` : '') +
-             `${String(s).padStart(2,'0')}s ago`;
+             `${String(s).padStart(2,'0')}s`;
     }
 
     let _swapTime = Date.now();
@@ -132,7 +170,7 @@
         const base = parseInt(el.dataset.elapsed, 10) || 0;
         const update = () => {
           const drift = Math.floor((Date.now() - _swapTime) / 1000);
-          el.textContent = '(' + _fmtElapsed(base + drift) + ')';
+          el.textContent = _fmtElapsed(base + drift);
         };
         update();
         if (el._timer) clearInterval(el._timer);
@@ -141,7 +179,10 @@
     }
 
     document.addEventListener('DOMContentLoaded', _startElapsedTimers);
-    document.body.addEventListener('htmx:afterSwap', _startElapsedTimers);
+    document.body.addEventListener('htmx:afterSwap', () => {
+      _countdown = REFRESH_SECS;
+      _startElapsedTimers();
+    });
   </script>
 </body>
 </html>
