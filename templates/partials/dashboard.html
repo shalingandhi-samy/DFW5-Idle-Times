@@ -3,18 +3,119 @@
 {% set bg_list = associates | selectattr("resolved_sc_code", "equalto", "019034295") | list %}
 {% set cp_list = associates | selectattr("resolved_sc_code", "equalto", "019357098") | list %}
 {% set sk_list = associates | selectattr("resolved_sc_code", "equalto", "002172268") | list %}
-{% set sp_red    = sp_list | selectattr("elapsed_secs") | selectattr("elapsed_secs", "ge", 1800) | list | length %}
-{% set sp_yellow = sp_list | selectattr("elapsed_secs") | selectattr("elapsed_secs", "ge", 900)  | list | length - sp_red %}
-{% set bf_red    = bf_list | selectattr("elapsed_secs") | selectattr("elapsed_secs", "ge", 1800) | list | length %}
-{% set bf_yellow = bf_list | selectattr("elapsed_secs") | selectattr("elapsed_secs", "ge", 900)  | list | length - bf_red %}
-{% set bg_red    = bg_list | selectattr("elapsed_secs") | selectattr("elapsed_secs", "ge", 1800) | list | length %}
-{% set bg_yellow = bg_list | selectattr("elapsed_secs") | selectattr("elapsed_secs", "ge", 900)  | list | length - bg_red %}
-{% set cp_red    = cp_list | selectattr("elapsed_secs") | selectattr("elapsed_secs", "ge", 1800) | list | length %}
-{% set cp_yellow = cp_list | selectattr("elapsed_secs") | selectattr("elapsed_secs", "ge", 900)  | list | length - cp_red %}
-{% set sk_red    = sk_list | selectattr("elapsed_secs") | selectattr("elapsed_secs", "ge", 1800) | list | length %}
-{% set sk_yellow = sk_list | selectattr("elapsed_secs") | selectattr("elapsed_secs", "ge", 900)  | list | length - sk_red %}
 
-<!-- ── Meta bar ─────────────────────────────────────────────────────────────── -->
+{# ── Helpers ────────────────────────────────────────────────────────────────── #}
+{% macro alert_counts(lst) %}
+  {% set red    = lst | selectattr("elapsed_secs") | selectattr("elapsed_secs", "ge", 1800) | list | length %}
+  {% set yellow = lst | selectattr("elapsed_secs") | selectattr("elapsed_secs", "ge", 900)  | list | length - red %}
+  {% set green  = lst | length - yellow - red %}
+  {{ red }},{{ yellow }},{{ green }}
+{% endmacro %}
+
+{% macro summary_card(lst, title, code, accent_bg, accent_border, num_color) %}
+{% set red    = lst | selectattr("elapsed_secs") | selectattr("elapsed_secs", "ge", 1800) | list | length %}
+{% set yellow = lst | selectattr("elapsed_secs") | selectattr("elapsed_secs", "ge", 900)  | list | length - red %}
+{% set green  = lst | length - yellow - red %}
+<div class="card-dark rounded-2xl p-5">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 {{ accent_bg }} rounded-xl flex items-center justify-center">
+        <img src="/static/spark.svg" class="w-6 h-6" alt="Spark"/>
+      </div>
+      <div>
+        <p class="font-bold text-slate-100 text-sm">{{ title }}</p>
+        <p class="text-xs text-slate-500 font-mono">{{ code }}</p>
+      </div>
+    </div>
+    <div class="text-5xl font-extrabold {{ num_color }}">{{ lst | length }}</div>
+  </div>
+  <div class="flex gap-2 text-xs font-semibold flex-wrap">
+    <span class="flex items-center gap-1 bg-green-500/10 border border-green-500/20 text-green-400 px-2.5 py-1 rounded-full">
+      <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>{{ green }} Active
+    </span>
+    <span class="flex items-center gap-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 px-2.5 py-1 rounded-full">
+      <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>{{ yellow }} Watch
+    </span>
+    <span class="flex items-center gap-1 bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-1 rounded-full">
+      <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>{{ red }} Alert
+    </span>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro assoc_table(lst, title, accent_text, accent_border) %}
+<div class="table-dark rounded-2xl overflow-hidden">
+  <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+    <div class="flex items-center gap-2.5">
+      <img src="/static/spark.svg" class="w-5 h-5" alt="Spark"/>
+      <span class="font-bold text-slate-100 text-sm">{{ title }}</span>
+    </div>
+    <span class="text-xs font-bold px-2.5 py-0.5 rounded-full border {{ accent_border }} {{ accent_text }} bg-white/5">
+      {{ lst | length }} associates
+    </span>
+  </div>
+  <table class="w-full text-sm styled-table">
+    <thead>
+      <tr class="thead-dark text-slate-500 text-xs uppercase tracking-wider">
+        <th class="px-4 py-3 text-center w-10">#</th>
+        <th class="px-4 py-3 text-left">Name</th>
+        <th class="px-4 py-3 text-center">Last Scan</th>
+        <th class="px-4 py-3 text-center">Idle Time</th>
+        <th class="px-4 py-3 text-center w-10"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-dark">
+      {% for a in lst %}
+      {% set secs = a.elapsed_secs or 0 %}
+      {% if secs >= 1800 %}
+        {% set border = 'row-red' %}
+        {% set badge  = 'bg-red-500/15 text-red-400 border border-red-500/30' %}
+      {% elif secs >= 900 %}
+        {% set border = 'row-yellow' %}
+        {% set badge  = 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30' %}
+      {% else %}
+        {% set border = 'row-green' %}
+        {% set badge  = 'bg-green-500/15 text-green-400 border border-green-500/30' %}
+      {% endif %}
+      <tr class="{{ border }} row-hover transition-colors duration-100">
+        <td class="px-3 py-3 text-center">
+          <span class="text-xs font-bold text-slate-600">{{ loop.index }}</span>
+        </td>
+        <td class="px-4 py-3">
+          <span class="font-semibold text-slate-100 text-sm">{{ a.name or '—' }}</span>
+        </td>
+        <td class="px-4 py-3 text-center">
+          <span class="font-mono text-xs text-slate-500">{{ a.timestamp or '—' }}</span>
+        </td>
+        <td class="px-4 py-3 text-center">
+          <span class="elapsed-timer inline-block font-mono font-bold text-xs px-2.5 py-1 rounded-full {{ badge }}"
+                data-elapsed="{{ a.elapsed_secs or 0 }}">…</span>
+        </td>
+        <td class="px-3 py-3 text-center">
+          {% if a.drax_url and a.associate_id %}
+          <a href="{{ a.drax_url }}" target="_blank"
+             class="text-slate-600 hover:text-blue-400 transition-colors" title="Open in DRAX">
+            <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/>
+            </svg>
+          </a>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" class="px-5 py-8 text-center text-sm text-slate-600 italic">No associates found</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endmacro %}
+
+{# ─────────────────────────────────────────────────────────────────────────── #}
+
+<!-- ── Meta bar ──────────────────────────────────────────────────────────── -->
 <div class="flex items-center justify-between mb-5 text-sm">
   <div class="flex items-center gap-2 text-slate-500">
     {% if scraped_at %}
@@ -32,7 +133,7 @@
   </span>
 </div>
 
-<!-- ── Banners ─────────────────────────────────────────────────────────────── -->
+<!-- ── Banners ────────────────────────────────────────────────────────────── -->
 {% if refreshing %}
 <div class="flex items-center gap-3 bg-blue-950 border border-blue-800 text-blue-300 rounded-2xl px-5 py-3.5 mb-5">
   <div class="w-4 h-4 border-2 border-blue-700 border-t-blue-300 rounded-full animate-spin flex-shrink-0"></div>
@@ -46,258 +147,44 @@
 </div>
 {% endif %}
 
-<!-- ── Summary cards ───────────────────────────────────────────────────────── -->
-<div class="grid grid-cols-3 gap-4 mb-6">
-
-  <!-- Stationary Picking -->
-  <div class="card-dark rounded-2xl p-5">
-    <div class="flex items-center justify-between mb-4">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-blue-500/10 border border-blue-500/20 rounded-xl
-                    flex items-center justify-center">
-          <img src="/static/spark.svg" class="w-6 h-6" alt="Spark"/>
-        </div>
-        <div>
-          <p class="font-bold text-slate-100 text-sm">Stationary Picking</p>
-          <p class="text-xs text-slate-500 font-mono">019209516</p>
-        </div>
-      </div>
-      <div class="text-5xl font-extrabold text-blue-400">{{ sp_list | length }}</div>
-    </div>
-    <div class="flex gap-2 text-xs font-semibold flex-wrap">
-      <span class="flex items-center gap-1 bg-green-500/10 border border-green-500/20 text-green-400 px-2.5 py-1 rounded-full">
-        <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-        {{ sp_list | length - sp_yellow - sp_red }} Active
-      </span>
-      <span class="flex items-center gap-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 px-2.5 py-1 rounded-full">
-        <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>
-        {{ sp_yellow }} Watch
-      </span>
-      <span class="flex items-center gap-1 bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-1 rounded-full">
-        <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-        {{ sp_red }} Alert
-      </span>
-    </div>
-  </div>
-
-  <!-- Box Finishing -->
-  <div class="card-dark rounded-2xl p-5">
-    <div class="flex items-center justify-between mb-4">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-yellow-500/10 border border-yellow-500/20 rounded-xl
-                    flex items-center justify-center">
-          <img src="/static/spark.svg" class="w-6 h-6" alt="Spark"/>
-        </div>
-        <div>
-          <p class="font-bold text-slate-100 text-sm">Box Finishing</p>
-          <p class="text-xs text-slate-500 font-mono">019034514</p>
-        </div>
-      </div>
-      <div class="text-5xl font-extrabold text-yellow-400">{{ bf_list | length }}</div>
-    </div>
-    <div class="flex gap-2 text-xs font-semibold flex-wrap">
-      <span class="flex items-center gap-1 bg-green-500/10 border border-green-500/20 text-green-400 px-2.5 py-1 rounded-full">
-        <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-        {{ bf_list | length - bf_yellow - bf_red }} Active
-      </span>
-      <span class="flex items-center gap-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 px-2.5 py-1 rounded-full">
-        <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>
-        {{ bf_yellow }} Watch
-      </span>
-      <span class="flex items-center gap-1 bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-1 rounded-full">
-        <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-        {{ bf_red }} Alert
-      </span>
-    </div>
-  </div>
-
-  <!-- Bagging - Manual -->
-  <div class="card-dark rounded-2xl p-5">
-    <div class="flex items-center justify-between mb-4">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-purple-500/10 border border-purple-500/20 rounded-xl
-                    flex items-center justify-center">
-          <img src="/static/spark.svg" class="w-6 h-6" alt="Spark"/>
-        </div>
-        <div>
-          <p class="font-bold text-slate-100 text-sm">Bagging - Manual</p>
-          <p class="text-xs text-slate-500 font-mono">019034295</p>
-        </div>
-      </div>
-      <div class="text-5xl font-extrabold text-purple-400">{{ bg_list | length }}</div>
-    </div>
-    <div class="flex gap-2 text-xs font-semibold flex-wrap">
-      <span class="flex items-center gap-1 bg-green-500/10 border border-green-500/20 text-green-400 px-2.5 py-1 rounded-full">
-        <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-        {{ bg_list | length - bg_yellow - bg_red }} Active
-      </span>
-      <span class="flex items-center gap-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 px-2.5 py-1 rounded-full">
-        <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>
-        {{ bg_yellow }} Watch
-      </span>
-      <span class="flex items-center gap-1 bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-1 rounded-full">
-        <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-        {{ bg_red }} Alert
-      </span>
-    </div>
-  </div>
-
-  <!-- CPS Packing -->
-  <div class="card-dark rounded-2xl p-5">
-    <div class="flex items-center justify-between mb-4">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-teal-500/10 border border-teal-500/20 rounded-xl flex items-center justify-center">
-          <img src="/static/spark.svg" class="w-6 h-6" alt="Spark"/>
-        </div>
-        <div>
-          <p class="font-bold text-slate-100 text-sm">CPS Packing</p>
-          <p class="text-xs text-slate-500 font-mono">019357098</p>
-        </div>
-      </div>
-      <div class="text-5xl font-extrabold text-teal-400">{{ cp_list | length }}</div>
-    </div>
-    <div class="flex gap-2 text-xs font-semibold flex-wrap">
-      <span class="flex items-center gap-1 bg-green-500/10 border border-green-500/20 text-green-400 px-2.5 py-1 rounded-full">
-        <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-        {{ cp_list | length - cp_yellow - cp_red }} Active
-      </span>
-      <span class="flex items-center gap-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 px-2.5 py-1 rounded-full">
-        <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>
-        {{ cp_yellow }} Watch
-      </span>
-      <span class="flex items-center gap-1 bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-1 rounded-full">
-        <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-        {{ cp_red }} Alert
-      </span>
-    </div>
-  </div>
-
-  <!-- Special Picking -->
-  <div class="card-dark rounded-2xl p-5">
-    <div class="flex items-center justify-between mb-4">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-orange-500/10 border border-orange-500/20 rounded-xl flex items-center justify-center">
-          <img src="/static/spark.svg" class="w-6 h-6" alt="Spark"/>
-        </div>
-        <div>
-          <p class="font-bold text-slate-100 text-sm">Special Picking</p>
-          <p class="text-xs text-slate-500 font-mono">002172268</p>
-        </div>
-      </div>
-      <div class="text-5xl font-extrabold text-orange-400">{{ sk_list | length }}</div>
-    </div>
-    <div class="flex gap-2 text-xs font-semibold flex-wrap">
-      <span class="flex items-center gap-1 bg-green-500/10 border border-green-500/20 text-green-400 px-2.5 py-1 rounded-full">
-        <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-        {{ sk_list | length - sk_yellow - sk_red }} Active
-      </span>
-      <span class="flex items-center gap-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 px-2.5 py-1 rounded-full">
-        <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>
-        {{ sk_yellow }} Watch
-      </span>
-      <span class="flex items-center gap-1 bg-red-500/10 border border-red-500/20 text-red-400 px-2.5 py-1 rounded-full">
-        <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-        {{ sk_red }} Alert
-      </span>
-    </div>
-  </div>
-
-</div>
-
-<!-- ── Associate tables ────────────────────────────────────────────────────── -->
 {% if associates %}
-<div class="grid grid-cols-3 gap-5">
 
-  {% for dept_list, title, accent_text, accent_border in [
-    (sp_list, 'Stationary Picking', 'text-blue-400',   'border-blue-500/30'),
-    (bf_list, 'Box Finishing',      'text-yellow-400',  'border-yellow-500/30'),
-    (bg_list, 'Bagging - Manual',   'text-purple-400',  'border-purple-500/30'),
-    (cp_list, 'CPS Packing',        'text-teal-400',    'border-teal-500/30'),
-    (sk_list, 'Special Picking',    'text-orange-400',  'border-orange-500/30')
-  ] %}
-  <div class="table-dark rounded-2xl overflow-hidden">
+<!-- ══════════════════════════════════════════════════════════════════════════
+     GROUP 1 — Stationary Picking · Box Finishing · Bagging - Manual
+     ══════════════════════════════════════════════════════════════════════════ -->
 
-    <!-- Card header -->
-    <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-      <div class="flex items-center gap-2.5">
-        <img src="/static/spark.svg" class="w-5 h-5" alt="Spark"/>
-        <span class="font-bold text-slate-100 text-sm">{{ title }}</span>
-      </div>
-      <span class="text-xs font-bold px-2.5 py-0.5 rounded-full border {{ accent_border }} {{ accent_text }}
-                   bg-white/5">
-        {{ dept_list | length }} associates
-      </span>
-    </div>
-
-    <!-- Table -->
-    <table class="w-full text-sm styled-table">
-      <thead>
-        <tr class="thead-dark text-slate-500 text-xs uppercase tracking-wider">
-          <th class="px-4 py-3 text-center w-10">#</th>
-          <th class="px-4 py-3 text-left">Name</th>
-          <th class="px-4 py-3 text-center">Last Scan</th>
-          <th class="px-4 py-3 text-center">Idle Time</th>
-          <th class="px-4 py-3 text-center w-10"></th>
-        </tr>
-      </thead>
-      <tbody class="divide-dark">
-        {% for a in dept_list %}
-        {% set secs = a.elapsed_secs or 0 %}
-        {% if secs >= 1800 %}
-          {% set border = 'row-red' %}
-          {% set badge  = 'bg-red-500/15 text-red-400 border border-red-500/30' %}
-        {% elif secs >= 900 %}
-          {% set border = 'row-yellow' %}
-          {% set badge  = 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30' %}
-        {% else %}
-          {% set border = 'row-green' %}
-          {% set badge  = 'bg-green-500/15 text-green-400 border border-green-500/30' %}
-        {% endif %}
-
-        <tr class="{{ border }} row-hover transition-colors duration-100">
-          <td class="px-3 py-3 text-center">
-            <span class="text-xs font-bold text-slate-600">{{ loop.index }}</span>
-          </td>
-          <td class="px-4 py-3">
-            <span class="font-semibold text-slate-100 text-sm">{{ a.name or '—' }}</span>
-          </td>
-          <td class="px-4 py-3 text-center">
-            <span class="font-mono text-xs text-slate-500">{{ a.timestamp or '—' }}</span>
-          </td>
-          <td class="px-4 py-3 text-center">
-            <span class="elapsed-timer inline-block font-mono font-bold text-xs
-                         px-2.5 py-1 rounded-full {{ badge }}"
-                  data-elapsed="{{ a.elapsed_secs or 0 }}">…</span>
-          </td>
-          <td class="px-3 py-3 text-center">
-            {% if a.drax_url and a.associate_id %}
-            <a href="{{ a.drax_url }}" target="_blank"
-               class="text-slate-600 hover:text-blue-400 transition-colors" title="Open in DRAX">
-              <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                  d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/>
-              </svg>
-            </a>
-            {% endif %}
-          </td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="5" class="px-5 py-8 text-center text-sm text-slate-600 italic">
-            No associates found
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-
-  </div>
-  {% endfor %}
-
+<!-- Cards -->
+<div class="grid grid-cols-3 gap-4 mb-4">
+  {{ summary_card(sp_list, 'Stationary Picking', '019209516', 'bg-blue-500/10 border border-blue-500/20',   'border-blue-500/20',   'text-blue-400')   }}
+  {{ summary_card(bf_list, 'Box Finishing',      '019034514', 'bg-yellow-500/10 border border-yellow-500/20','border-yellow-500/20', 'text-yellow-400') }}
+  {{ summary_card(bg_list, 'Bagging - Manual',   '019034295', 'bg-purple-500/10 border border-purple-500/20','border-purple-500/20', 'text-purple-400') }}
 </div>
 
-<!-- ── Legend ──────────────────────────────────────────────────────────────── -->
-<div class="flex items-center justify-center gap-6 mt-5 text-xs text-slate-600 font-medium">
+<!-- Tables -->
+<div class="grid grid-cols-3 gap-5 mb-8">
+  {{ assoc_table(sp_list, 'Stationary Picking', 'text-blue-400',   'border-blue-500/30')   }}
+  {{ assoc_table(bf_list, 'Box Finishing',      'text-yellow-400', 'border-yellow-500/30') }}
+  {{ assoc_table(bg_list, 'Bagging - Manual',   'text-purple-400', 'border-purple-500/30') }}
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     GROUP 2 — CPS Packing · Special Picking
+     ══════════════════════════════════════════════════════════════════════════ -->
+
+<!-- Cards -->
+<div class="grid grid-cols-2 gap-4 mb-4">
+  {{ summary_card(cp_list, 'CPS Packing',     '019357098', 'bg-teal-500/10 border border-teal-500/20',     'border-teal-500/20',   'text-teal-400')   }}
+  {{ summary_card(sk_list, 'Special Picking', '002172268', 'bg-orange-500/10 border border-orange-500/20', 'border-orange-500/20', 'text-orange-400') }}
+</div>
+
+<!-- Tables -->
+<div class="grid grid-cols-2 gap-5 mb-6">
+  {{ assoc_table(cp_list, 'CPS Packing',     'text-teal-400',   'border-teal-500/30')   }}
+  {{ assoc_table(sk_list, 'Special Picking', 'text-orange-400', 'border-orange-500/30') }}
+</div>
+
+<!-- ── Legend ─────────────────────────────────────────────────────────────── -->
+<div class="flex items-center justify-center gap-6 text-xs text-slate-600 font-medium">
   <span class="flex items-center gap-1.5">
     <span class="w-3 h-0.5 bg-green-500 rounded inline-block"></span> &lt; 15 min — Active
   </span>
