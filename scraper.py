@@ -20,8 +20,9 @@ PYTHON        = sys.executable
 IDLE_THRESHOLD_HRS = 0.25
 
 TARGET_SC_CODES: dict[str, str] = {
-    "019209516": "Stationary Pick",
+    "019209516": "Stationary Picking",
     "019034514": "Box Finishing",
+    "019034295": "Bagging - Manual",
 }
 
 

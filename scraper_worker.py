@@ -28,11 +28,12 @@ OUT_FILE  = BASE_DIR / "results.json"
 DRAX_BASE = "https://drax.walmart.com"
 ASSOC_URL = f"{DRAX_BASE}/associates/"
 
-TARGET_DEPTS = {"stationary picking", "box finishing"}
+TARGET_DEPTS = {"stationary picking", "box finishing", "bagging - manual", "bagging manual", "bagging"}
 
 TARGET_SC_CODES: dict[str, str] = {
     "019209516": "Stationary Picking",
     "019034514": "Box Finishing",
+    "019034295": "Bagging - Manual",
 }
 
 # ── JavaScript extractor ──────────────────────────────────────────────────────
@@ -189,7 +190,12 @@ async def main() -> None:
         if sc_code in TARGET_SC_CODES:
             row["resolved_sc_code"] = sc_code
         elif any(t in dept for t in TARGET_DEPTS):
-            row["resolved_sc_code"] = "019209516" if "stationary" in dept else "019034514"
+            if "stationary" in dept:
+                row["resolved_sc_code"] = "019209516"
+            elif "box" in dept:
+                row["resolved_sc_code"] = "019034514"
+            else:
+                row["resolved_sc_code"] = "019034295"
         else:
             continue
 
