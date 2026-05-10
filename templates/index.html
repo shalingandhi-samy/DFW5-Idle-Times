@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>DFW5 Idle Times</title>
+  <title>{{ building.name }} Idle Times</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -65,14 +65,19 @@
     <div class="max-w-7xl mx-auto px-6 py-5">
       <div class="flex items-center justify-between">
 
-        <!-- Brand -->
+        <!-- Back + Brand -->
         <div class="flex items-center gap-4">
+          <a href="/" class="text-slate-400 hover:text-white transition-colors" title="All Buildings">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/>
+            </svg>
+          </a>
           <div class="bg-white/5 border border-white/10 rounded-2xl p-2.5">
             <img src="/static/spark.svg" class="w-9 h-9" alt="Walmart Spark"/>
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <h1 class="text-2xl font-extrabold tracking-tight text-white">DFW5 Idle Times</h1>
+              <h1 class="text-2xl font-extrabold tracking-tight text-white">{{ building.name }} Idle Times</h1>
               <span class="flex items-center gap-1.5 bg-green-500/10 border border-green-500/30
                            text-green-400 text-xs font-semibold px-2.5 py-0.5 rounded-full">
                 <span class="live-dot w-1.5 h-1.5 bg-green-400 rounded-full inline-block"></span>
@@ -80,7 +85,7 @@
               </span>
             </div>
             <p class="text-slate-400 text-sm mt-0.5 font-medium">
-              Stationary Picking &amp; Box Finishing &nbsp;·&nbsp; DFW5 Fulfillment Center
+              {{ building.label }} &nbsp;·&nbsp; Stationary Picking &amp; Box Finishing &amp; More
             </p>
           </div>
         </div>
@@ -96,7 +101,7 @@
             <div>Auto every {{ refresh_secs // 60 }} min</div>
           </div>
           <button
-            hx-post="/refresh"
+            hx-post="/refresh/{{ building.id }}"
             hx-target="#dashboard-content"
             hx-swap="innerHTML"
             hx-indicator="#spinner"
@@ -128,7 +133,7 @@
   <main class="max-w-7xl mx-auto px-6 py-6">
     <div
       id="dashboard-content"
-      hx-get="/data"
+      hx-get="/data/{{ building.id }}"
       hx-trigger="every {{ poll_secs }}s"
       hx-swap="innerHTML"
       hx-indicator="#spinner">

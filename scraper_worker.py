@@ -1,10 +1,11 @@
 """
-scraper_worker.py — Simple Playwright scraper for DRAX /associates/.
+scraper_worker.py — Playwright scraper for DRAX /associates/.
 
-Finds everyone with Status=IN and Current Dept = Stationary Picking or Box Finishing.
-Computes elapsed_secs server-side so the browser timer is timezone-agnostic.
+Usage:
+    python scraper_worker.py <building_id> <tz_offset_secs>
 
-Run as subprocess via scraper.py. Writes results.json then exits.
+Switches the active FC in DRAX to the target building, scrapes all
+associates, filters to target SC codes, and writes results_<building>.json.
 """
 
 from __future__ import annotations
@@ -21,20 +22,19 @@ from playwright.async_api import async_playwright
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
+# ── Args ──────────────────────────────────────────────────────────────────────
+BUILDING_ID     = sys.argv[1] if len(sys.argv) > 1 else "dfw5"
+TZ_OFFSET_SECS  = int(sys.argv[2]) if len(sys.argv) > 2 else -3600
+FC_SEARCH       = sys.argv[3] if len(sys.argv) > 3 else "DFW5"
+
 BASE_DIR  = Path(__file__).parent
 AUTH_FILE = BASE_DIR / "auth_state.json"
-OUT_FILE  = BASE_DIR / "results.json"
+OUT_FILE  = BASE_DIR / f"results_{BUILDING_ID}.json"
 
 DRAX_BASE = "https://drax.walmart.com"
 ASSOC_URL = f"{DRAX_BASE}/associates/"
 
-TARGET_DEPTS = {
-    "stationary picking", "box finishing",
-    "bagging - manual", "bagging manual", "bagging",
-    "central problem solve", "cps packing", "cps",
-    "special picking",
-}
-
+# ── SC codes / dept matching ──────────────────────────────────────────────────
 TARGET_SC_CODES: dict[str, str] = {
     "019209516": "Stationary Picking",
     "019034514": "Box Finishing",
@@ -43,7 +43,15 @@ TARGET_SC_CODES: dict[str, str] = {
     "002172268": "Special Picking",
 }
 
-# ── JavaScript extractor ──────────────────────────────────────────────────────
+TARGET_DEPTS: set[str] = {
+    "stationary picking",
+    "box finishing",
+    "bagging - manual", "bagging manual", "bagging",
+    "central problem solve", "cps packing", "cps",
+    "special picking",
+}
+
+# ── JavaScript DataTable extractor ────────────────────────────────────────────
 _EXTRACT_JS = """
 () => {
   const tables = $('table').filter(function() {
@@ -74,7 +82,6 @@ _EXTRACT_JS = """
     const raw   = cells.map(c => c.innerText.trim());
     const obj   = { _raw: raw };
 
-    // Associate ID from any link in the row
     const link = this.node().querySelector('a[href*="/associates/"]');
     if (link) {
       const parts = link.href.split('/associates/');
@@ -155,10 +162,41 @@ async def _wait_for_table(page: Any) -> bool:
         return False
 
 
+async def _switch_fc(page: Any, fc_name: str) -> bool:
+    """Click the FC switcher, search for fc_name, and select it."""
+    try:
+        print(f"[INFO] Switching FC to {fc_name}…")
+
+        # Click the FC button in the navbar (contains "FC:" text)
+        fc_btn = page.locator("a.nav-link:has-text('FC:'), button:has-text('FC:')")
+        await fc_btn.first.click(timeout=10_000)
+
+        # Wait for the FC modal to appear
+        modal = page.locator("#fc-modal-dialog, .modal.show")
+        await modal.first.wait_for(state="visible", timeout=10_000)
+
+        # Type building name into the search box inside the modal
+        search = page.locator("#fc-modal-dialog input[type='search'], .modal.show input[type='search']")
+        await search.first.fill(fc_name, timeout=5_000)
+        await page.wait_for_timeout(600)
+
+        # Click the first matching FC link in the modal table
+        fc_link = page.locator(f"#fc-modal-dialog a:has-text('{fc_name}'), .modal.show a:has-text('{fc_name}')")
+        await fc_link.first.click(timeout=8_000)
+
+        print(f"[INFO] FC switched to {fc_name} — waiting for table reload…")
+        await page.wait_for_timeout(2_000)
+        return True
+    except Exception as exc:
+        print(f"[WARN] FC switch failed: {exc} — scraping whatever FC is active")
+        return False
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 async def main() -> None:
     storage = json.loads(AUTH_FILE.read_text()) if AUTH_FILE.exists() else None
+    print(f"[INFO] Building={BUILDING_ID} | FC={FC_SEARCH} | tz_offset={TZ_OFFSET_SECS}s")
     print(f"[INFO] Navigating to {ASSOC_URL}")
 
     async with async_playwright() as pw:
@@ -166,12 +204,23 @@ async def main() -> None:
         page = await ctx.new_page()
         await page.goto(ASSOC_URL, wait_until="domcontentloaded", timeout=60_000)
 
+        # SSO redirect
         if not page.url.startswith(DRAX_BASE):
-            print(f"[INFO] SSO redirect — waiting up to 3 min for login...")
+            print(f"[INFO] SSO redirect — waiting up to 3 min for login…")
             await page.wait_for_url(f"{DRAX_BASE}/**", timeout=180_000)
 
+        # Wait for initial table
         if not await _wait_for_table(page):
-            _write_error("Timed out waiting for associates table on /associates/")
+            _write_error("Timed out waiting for associates table")
+            await browser.close()
+            return
+
+        # Switch to the target FC
+        await _switch_fc(page, FC_SEARCH)
+
+        # Wait for table to reload with new FC data
+        if not await _wait_for_table(page):
+            _write_error(f"Timed out after FC switch to {FC_SEARCH}")
             await browser.close()
             return
 
@@ -212,9 +261,13 @@ async def main() -> None:
         else:
             continue
 
-        # Server clock is Eastern, DRAX timestamps are Central — subtract 1 hr
+        # Elapsed seconds — apply per-building timezone correction
         ts_dt = _parse_drax_ts(row.get("timestamp"))
-        row["elapsed_secs"] = max(0, int((now - ts_dt).total_seconds()) - 3600) if ts_dt else None
+        if ts_dt:
+            raw_secs = int((now - ts_dt).total_seconds()) + TZ_OFFSET_SECS
+            row["elapsed_secs"] = max(0, raw_secs)
+        else:
+            row["elapsed_secs"] = None
 
         row["drax_url"] = (
             f"{DRAX_BASE}/associates/{row['associate_id']}/"
@@ -222,10 +275,9 @@ async def main() -> None:
         )
         matches.append(row)
 
-    print(f"[INFO] Filtered to {len(matches)} associates (IN + target dept)")
-
-    # Highest idle time first within each dept
+    # Sort: highest idle time first
     matches.sort(key=lambda r: r.get("elapsed_secs") or 0, reverse=True)
+    print(f"[INFO] Filtered to {len(matches)} associates (IN + target dept)")
 
     dept_totals: dict[str, dict] = {
         code: {"label": label, "total": 0, "flagged": 0}
@@ -243,7 +295,7 @@ async def main() -> None:
         "scraped_at":  now.isoformat(timespec="seconds"),
         "error":       None,
     }))
-    print(f"[INFO] Done — {len(matches)} associates written to results.json")
+    print(f"[INFO] Done — {len(matches)} associates written to {OUT_FILE.name}")
 
 
 def _write_error(msg: str) -> None:
