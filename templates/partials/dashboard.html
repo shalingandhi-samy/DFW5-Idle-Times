@@ -73,12 +73,28 @@
       </thead>
       <tbody class="divide-y divide-gray-100">
         {% for a in sp_list %}
-        <tr class="hover:bg-blue-50 transition-colors">
+        {% set secs = a.elapsed_secs or 0 %}
+        {% if secs >= 1800 %}
+          {% set row_cls = 'bg-red-50 hover:bg-red-100' %}
+        {% elif secs >= 900 %}
+          {% set row_cls = 'bg-yellow-50 hover:bg-yellow-100' %}
+        {% else %}
+          {% set row_cls = 'bg-green-50 hover:bg-green-100' %}
+        {% endif %}
+        <tr class="{{ row_cls }} transition-colors">
           <td class="px-4 py-2 font-medium text-gray-800">{{ a.name or '—' }}</td>
           <td class="px-4 py-2 text-center font-mono text-xs text-gray-600">
             {% if a.timestamp %}
+              {% set secs = a.elapsed_secs or 0 %}
+              {% if secs >= 1800 %}
+                {% set timer_cls = 'text-red-600 font-bold' %}
+              {% elif secs >= 900 %}
+                {% set timer_cls = 'text-yellow-600 font-bold' %}
+              {% else %}
+                {% set timer_cls = 'text-green-600 font-semibold' %}
+              {% endif %}
               <span>{{ a.timestamp }}</span>
-              <span class="elapsed-timer ml-1 text-wmt-blue font-semibold"
+              <span class="elapsed-timer ml-1 {{ timer_cls }}"
                     data-elapsed="{{ a.elapsed_secs or 0 }}">…</span>
             {% else %}—{% endif %}
           </td>
@@ -112,12 +128,28 @@
       </thead>
       <tbody class="divide-y divide-gray-100">
         {% for a in bf_list %}
-        <tr class="hover:bg-yellow-50 transition-colors">
+        {% set secs = a.elapsed_secs or 0 %}
+        {% if secs >= 1800 %}
+          {% set row_cls = 'bg-red-50 hover:bg-red-100' %}
+        {% elif secs >= 900 %}
+          {% set row_cls = 'bg-yellow-50 hover:bg-yellow-100' %}
+        {% else %}
+          {% set row_cls = 'bg-green-50 hover:bg-green-100' %}
+        {% endif %}
+        <tr class="{{ row_cls }} transition-colors">
           <td class="px-4 py-2 font-medium text-gray-800">{{ a.name or '—' }}</td>
           <td class="px-4 py-2 text-center font-mono text-xs text-gray-600">
             {% if a.timestamp %}
+              {% set secs = a.elapsed_secs or 0 %}
+              {% if secs >= 1800 %}
+                {% set timer_cls = 'text-red-600 font-bold' %}
+              {% elif secs >= 900 %}
+                {% set timer_cls = 'text-yellow-600 font-bold' %}
+              {% else %}
+                {% set timer_cls = 'text-green-600 font-semibold' %}
+              {% endif %}
               <span>{{ a.timestamp }}</span>
-              <span class="elapsed-timer ml-1 text-yellow-700 font-semibold"
+              <span class="elapsed-timer ml-1 {{ timer_cls }}"
                     data-elapsed="{{ a.elapsed_secs or 0 }}">…</span>
             {% else %}—{% endif %}
           </td>
