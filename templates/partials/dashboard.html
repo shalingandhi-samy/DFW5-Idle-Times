@@ -79,7 +79,7 @@
             {% if a.timestamp %}
               <span>{{ a.timestamp }}</span>
               <span class="elapsed-timer ml-1 text-wmt-blue font-semibold"
-                    data-ts="{{ a.timestamp }}">…</span>
+                    data-elapsed="{{ a.elapsed_secs or 0 }}">…</span>
             {% else %}—{% endif %}
           </td>
           <td class="px-4 py-2 text-center">
@@ -118,7 +118,7 @@
             {% if a.timestamp %}
               <span>{{ a.timestamp }}</span>
               <span class="elapsed-timer ml-1 text-yellow-700 font-semibold"
-                    data-ts="{{ a.timestamp }}">…</span>
+                    data-elapsed="{{ a.elapsed_secs or 0 }}">…</span>
             {% else %}—{% endif %}
           </td>
           <td class="px-4 py-2 text-center">

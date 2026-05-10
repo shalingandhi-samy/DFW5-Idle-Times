@@ -111,30 +111,28 @@
       _startIdleTimers();
     });
 
-    // ── Elapsed timers (how long since last activity) ────────────────────────
-    function _fmtElapsed(totalSeconds) {
-      if (totalSeconds < 0) totalSeconds = 0;
-      const h = Math.floor(totalSeconds / 3600);
-      const m = Math.floor((totalSeconds % 3600) / 60);
-      const s = Math.floor(totalSeconds % 60);
+    // ── Elapsed timers ───────────────────────────────────────────────────────
+    // elapsed_secs is computed server-side — no browser timezone issues.
+    // JS just adds seconds elapsed since page load / last HTMX swap.
+    function _fmtElapsed(secs) {
+      if (secs < 0) secs = 0;
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = Math.floor(secs % 60);
       return (h ? `${h}h ` : '') +
              (h || m ? `${String(m).padStart(2,'0')}m ` : '') +
              `${String(s).padStart(2,'0')}s ago`;
     }
 
-    function _parseTs(ts) {
-      // DRAX format: "MM-DD HH:MM:SS" — prepend current year
-      const year = new Date().getFullYear();
-      return new Date(`${year}-${ts.replace(' ', 'T')}`);
-    }
+    let _swapTime = Date.now();
 
     function _startElapsedTimers() {
-      document.querySelectorAll('.elapsed-timer[data-ts]').forEach(el => {
-        const since = _parseTs(el.dataset.ts);
-        if (isNaN(since)) { el.textContent = ''; return; }
+      _swapTime = Date.now();
+      document.querySelectorAll('.elapsed-timer[data-elapsed]').forEach(el => {
+        const base = parseInt(el.dataset.elapsed, 10) || 0;
         const update = () => {
-          const secs = Math.floor((Date.now() - since.getTime()) / 1000);
-          el.textContent = '(' + _fmtElapsed(secs) + ')';
+          const drift = Math.floor((Date.now() - _swapTime) / 1000);
+          el.textContent = '(' + _fmtElapsed(base + drift) + ')';
         };
         update();
         if (el._timer) clearInterval(el._timer);
