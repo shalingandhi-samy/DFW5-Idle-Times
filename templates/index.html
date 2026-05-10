@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DFW5 Idle Times</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <style>
+    :root {
+      --wmt-blue:  #0053e2;
+      --wmt-spark: #ffc220;
+      --wmt-red:   #ea1100;
+      --wmt-green: #2a8703;
+    }
+    .bg-wmt-blue   { background-color: var(--wmt-blue); }
+    .text-wmt-blue { color: var(--wmt-blue); }
+    .bg-wmt-spark  { background-color: var(--wmt-spark); }
+    .border-wmt-blue { border-color: var(--wmt-blue); }
+    #spinner { display: none; }
+    .htmx-request #spinner { display: inline-block; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans text-gray-800">
+
+  <!-- ── Header ──────────────────────────────────────────────────────────── -->
+  <header class="bg-wmt-blue text-white shadow-md">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <svg class="w-8 h-8" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M16 2L18.4 11.6L28 9.2L21.2 16L28 22.8L18.4 20.4L16 30L13.6 20.4L4 22.8L10.8 16L4 9.2L13.6 11.6Z"
+                fill="#ffc220"/>
+        </svg>
+        <div>
+          <h1 class="text-xl font-bold leading-tight">DFW5 Idle Times</h1>
+          <p class="text-blue-200 text-sm">
+            Stationary Pick &amp; Box Finishing
+            {% if shift_after and shift_before %}
+              &nbsp;·&nbsp; Shift {{ shift_after[11:] }} – {{ shift_before[11:] }}
+            {% endif %}
+            &nbsp;·&nbsp; Alert &gt; {{ threshold_label }} idle
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <span id="spinner"
+          class="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin">
+        </span>
+        <button
+          hx-post="/refresh"
+          hx-target="#dashboard-content"
+          hx-swap="innerHTML"
+          hx-indicator="#spinner"
+          class="bg-white text-wmt-blue font-semibold px-4 py-2 rounded-lg text-sm
+                 hover:bg-blue-50 active:bg-blue-100 transition-colors shadow">
+          ↻ Refresh Now
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Monitored codes pill bar ────────────────────────────────────────── -->
+  <div class="max-w-7xl mx-auto px-6 pt-4 flex flex-wrap gap-2 items-center">
+    {% for code, label in target_codes.items() %}
+    <span class="bg-blue-100 text-wmt-blue text-xs font-mono px-3 py-1 rounded-full border border-blue-200">
+      {{ label }} · {{ code }}
+    </span>
+    {% endfor %}
+    <span class="bg-yellow-50 text-yellow-800 text-xs px-3 py-1 rounded-full border border-yellow-200 ml-auto">
+      Auto-refresh every {{ (refresh_secs // 60) }} min
+    </span>
+  </div>
+
+  <!-- ── HTMX-polled dashboard ────────────────────────────────────────────── -->
+  <main class="max-w-7xl mx-auto px-6 py-4">
+    <div
+      id="dashboard-content"
+      hx-get="/data"
+      hx-trigger="every {{ poll_secs }}s"
+      hx-swap="innerHTML"
+      hx-indicator="#spinner">
+      {% include "partials/dashboard.html" %}
+    </div>
+  </main>
+
+  <!-- ── Footer ──────────────────────────────────────────────────────────── -->
+  <footer class="max-w-7xl mx-auto px-6 py-6 text-center text-xs text-gray-400">
+    Data source:
+    <a href="https://drax.walmart.com/building_overview/" target="_blank"
+       class="text-wmt-blue underline">drax.walmart.com/building_overview</a>
+    &nbsp;·&nbsp; DFW5 FC &nbsp;·&nbsp; Threshold: {{ threshold_label }} idle
+  </footer>
+
+  <script>
+    // ── Countdown to next auto-refresh ──────────────────────────────────────
+    const REFRESH_SECS = {{ refresh_secs }};
+    let _countdown = REFRESH_SECS;
+
+    function _tickCountdown() {
+      _countdown = Math.max(0, _countdown - 1);
+      const mm = String(Math.floor(_countdown / 60)).padStart(2, '0');
+      const ss = String(_countdown % 60).padStart(2, '0');
+      const el = document.getElementById('next-refresh');
+      if (el) el.textContent = `Next refresh in ${mm}:${ss}`;
+    }
+    setInterval(_tickCountdown, 1000);
+
+    document.body.addEventListener('htmx:afterSwap', () => {
+      _countdown = REFRESH_SECS;
+      _startIdleTimers();
+    });
+
+    // ── Live idle timers ─────────────────────────────────────────────────────
+    function _fmtDuration(totalSeconds) {
+      if (totalSeconds < 0) totalSeconds = 0;
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = Math.floor(totalSeconds % 60);
+      return [
+        String(h).padStart(2, '0'),
+        String(m).padStart(2, '0'),
+        String(s).padStart(2, '0'),
+      ].join(':');
+    }
+
+    function _startIdleTimers() {
+      document.querySelectorAll('.idle-timer[data-since]').forEach(el => {
+        const since = new Date(el.dataset.since);
+        const update = () => {
+          const secs = Math.floor((Date.now() - since.getTime()) / 1000);
+          el.textContent = _fmtDuration(secs);
+        };
+        update();
+        if (el._timerInterval) clearInterval(el._timerInterval);
+        el._timerInterval = setInterval(update, 1000);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', _startIdleTimers);
+  </script>
+</body>
+</html>

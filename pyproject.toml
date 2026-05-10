@@ -1,0 +1,11 @@
+[project]
+name = "dfw5-idle-times"
+version = "0.1.0"
+description = "DFW5 Idle Times — Stationary Pick & Box Finishing dashboard"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.29",
+    "jinja2>=3.1",
+    "playwright>=1.44",
+]
